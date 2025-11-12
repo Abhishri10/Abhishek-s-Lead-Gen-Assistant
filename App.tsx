@@ -3,12 +3,13 @@ import React, { useState, useCallback, useEffect } from 'react';
 import { generateLeads, findLookalikeLeads } from './services/geminiService';
 import type { Lead, StoredSession } from './types';
 import LeadResultsTable from './components/LeadResultsTable';
-import { SparklesIcon } from './components/Icons';
+import Documentation from './components/Documentation';
+import { SparklesIcon, BookOpenIcon } from './components/Icons';
 
 const SearchPlatformOptions = [
-  { id: 'generalWeb', name: 'General Web' },
+  { id: 'generalWeb', name: 'In-depth Web Search' },
   { id: 'linkedIn', name: 'LinkedIn' },
-  { id: 'socialMedia', name: 'Social Media' }
+  { id: 'socialMedia', name: 'Social Media Search (FB, X, Instagram)' }
 ];
 
 const RegionOptions = ['Global', 'APAC', 'UK/Europe', 'USA', 'Canada', 'MENA', 'Africa'];
@@ -16,6 +17,16 @@ const DepartmentOptions = ['Marketing', 'International Marketing', 'Sales', 'CEO
 const CategoryOptions = ['Food', 'Retail', 'Technology', 'Travel & Tourism', 'Gaming & Betting'];
 
 const SESSION_STORAGE_KEY = 'leadGenSession';
+
+const loadingMessages = [
+  "Scanning web for expansion signals...",
+  "Analyzing company data...",
+  "Cross-referencing LinkedIn profiles...",
+  "Identifying key decision-makers...",
+  "Compiling deep-dive analysis...",
+  "Scoring lead potential...",
+  "Finalizing results..."
+];
 
 const App: React.FC = () => {
   const [clientName, setClientName] = useState('');
@@ -25,10 +36,13 @@ const App: React.FC = () => {
   const [searchPlatforms, setSearchPlatforms] = useState<string[]>(['generalWeb', 'linkedIn']);
   const [includeSimilarCompanies, setIncludeSimilarCompanies] = useState(false);
   const [composeEmail, setComposeEmail] = useState(false);
+  const [exclusionList, setExclusionList] = useState('');
   const [leads, setLeads] = useState<Lead[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isLookalikeLoading, setIsLookalikeLoading] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loadingMessage, setLoadingMessage] = useState(loadingMessages[0]);
+  const [showDocs, setShowDocs] = useState(false);
 
   useEffect(() => {
     try {
@@ -43,17 +57,34 @@ const App: React.FC = () => {
             setSearchPlatforms(query.searchPlatforms);
             setIncludeSimilarCompanies(query.includeSimilarCompanies || false);
             setComposeEmail(query.composeEmail || false);
+            setExclusionList(query.exclusionList || '');
         }
     } catch (e) {
         console.error("Failed to load saved session", e);
         localStorage.removeItem(SESSION_STORAGE_KEY);
     }
   }, []);
+  
+  useEffect(() => {
+    let interval: number;
+    if (isLoading) {
+      let i = 0;
+      interval = window.setInterval(() => {
+        i = (i + 1) % loadingMessages.length;
+        setLoadingMessage(loadingMessages[i]);
+      }, 2000);
+    }
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
+  }, [isLoading]);
 
   const saveSession = (currentLeads: Lead[]) => {
       const session: StoredSession = {
           leads: currentLeads,
-          query: { clientName, category, department, region, searchPlatforms, includeSimilarCompanies, composeEmail }
+          query: { clientName, category, department, region, searchPlatforms, includeSimilarCompanies, composeEmail, exclusionList }
       };
       localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
   }
@@ -67,6 +98,7 @@ const App: React.FC = () => {
       setSearchPlatforms(['generalWeb', 'linkedIn']);
       setIncludeSimilarCompanies(false);
       setComposeEmail(false);
+      setExclusionList('');
       setError(null);
       localStorage.removeItem(SESSION_STORAGE_KEY);
   }
@@ -83,7 +115,7 @@ const App: React.FC = () => {
     }
 
     try {
-      const generated = await generateLeads(category, department, searchPlatforms, clientName, region, includeSimilarCompanies, composeEmail);
+      const generated = await generateLeads(category, department, searchPlatforms, clientName, region, includeSimilarCompanies, composeEmail, exclusionList);
       setLeads(generated);
       saveSession(generated);
     } catch (err) {
@@ -91,13 +123,13 @@ const App: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [category, department, searchPlatforms, clientName, region, includeSimilarCompanies, composeEmail]);
+  }, [category, department, searchPlatforms, clientName, region, includeSimilarCompanies, composeEmail, exclusionList]);
 
   const handleFindLookalikes = useCallback(async (seedLead: Lead, index: number) => {
     setIsLookalikeLoading(index);
     setError(null);
     try {
-        const lookalikes = await findLookalikeLeads(seedLead, region, department);
+        const lookalikes = await findLookalikeLeads(seedLead, region, department, exclusionList);
         const updatedLeads = [...leads, ...lookalikes];
         setLeads(updatedLeads);
         saveSession(updatedLeads);
@@ -106,18 +138,27 @@ const App: React.FC = () => {
     } finally {
         setIsLookalikeLoading(null);
     }
-  }, [leads, region, department]);
+  }, [leads, region, department, exclusionList]);
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-200 flex flex-col items-center p-4 sm:p-6 lg:p-8">
+      {showDocs && <Documentation onClose={() => setShowDocs(false)} />}
       <div className="w-full max-w-7xl mx-auto">
-        <header className="text-center mb-10">
+        <header className="text-center mb-10 relative">
           <h1 className="text-4xl sm:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-cyan-400 mb-2">
-            Abhishek's Lead Gen Assistant
+            Abhishek's Inbound: AI Lead Gen Assistant
           </h1>
           <p className="text-lg text-slate-400">
             Discover untapped international clients showing intent to enter the Indian market.
           </p>
+          <button 
+            onClick={() => setShowDocs(true)} 
+            className="absolute top-0 right-0 flex items-center gap-2 text-slate-400 hover:text-cyan-400 transition-colors text-sm font-semibold"
+            title="Open Documentation"
+          >
+            <BookOpenIcon className="w-5 h-5" />
+            <span>Docs</span>
+          </button>
         </header>
 
         <main className="bg-slate-800/50 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-2xl border border-slate-700">
@@ -175,6 +216,20 @@ const App: React.FC = () => {
                 {DepartmentOptions.map(d => <option key={d} value={d}>{d}</option>)}
               </select>
             </div>
+          </div>
+
+          <div className="mb-6">
+              <label htmlFor="exclusionList" className="block text-sm font-semibold mb-2 text-slate-300">
+                Exclude Companies <span className="text-slate-400">(Optional, comma-separated)</span>
+              </label>
+              <textarea
+                id="exclusionList"
+                value={exclusionList}
+                onChange={(e) => setExclusionList(e.target.value)}
+                className="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-300 placeholder-slate-500"
+                placeholder="e.g., Competitor A, Old Prospect Inc, Known Partner LLC"
+                rows={2}
+              />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -242,7 +297,7 @@ const App: React.FC = () => {
               {isLoading ? (
                 <>
                   <div className="w-5 h-5 border-2 border-t-transparent border-white rounded-full animate-spin"></div>
-                  <span>Researching...</span>
+                  <span>{loadingMessage}</span>
                 </>
               ) : (
                 <>

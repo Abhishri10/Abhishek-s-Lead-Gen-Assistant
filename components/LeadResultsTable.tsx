@@ -42,6 +42,19 @@ const DeepDivePanel: React.FC<{ lead: Lead }> = ({ lead }) => (
         {lead.competitors?.map(comp => <span key={comp} className="bg-indigo-800 text-indigo-200 px-2 py-0.5 rounded font-bold">{comp}</span>)}
       </div>
     </div>
+    {lead.latestInstagramPosts && lead.latestInstagramPosts.length > 0 && (
+        <div className="col-span-2 md:col-span-4">
+            <h4 className="font-semibold text-slate-400 uppercase mb-2">Latest Instagram Posts</h4>
+            <div className="space-y-2">
+                {lead.latestInstagramPosts.map((post, index) => (
+                    <a key={index} href={post.url} target="_blank" rel="noopener noreferrer" className="block p-2 bg-slate-800/50 hover:bg-slate-700/50 rounded-md transition-colors">
+                        <p className="text-slate-200 truncate">{post.caption}</p>
+                        <p className="text-sky-400 text-xs truncate">{post.url}</p>
+                    </a>
+                ))}
+            </div>
+        </div>
+    )}
   </div>
 );
 
@@ -250,14 +263,33 @@ const LeadResultsTable: React.FC<LeadResultsTableProps> = ({ leads, region, onFi
         : 'N/A'
     }));
     const newsWorksheet = XLSX.utils.json_to_sheet(newsDataForSheet);
-
-    // Set column widths for news sheet for better readability
     newsWorksheet['!cols'] = [ { wch: 10 }, { wch: 30 }, { wch: 60 }, { wch: 60 } ];
+
+    // --- Sheet 3: Instagram Posts ---
+    const instaDataForSheet = leads.flatMap(lead => 
+        (lead.latestInstagramPosts && lead.latestInstagramPosts.length > 0) 
+        ? lead.latestInstagramPosts.map(post => ({
+            'Company Name': lead.companyName,
+            'Post Caption': post.caption,
+            'Post URL': { t: 's', v: post.url, l: { Target: post.url, Tooltip: `Click to open post` } }
+        })) 
+        : [{
+            'Company Name': lead.companyName,
+            'Post Caption': 'N/A',
+            // FIX: The 'Post URL' property must have a consistent type. It was a string here
+            // but an object for actual posts, causing a type error with the XLSX library.
+            // Changed to a cell object for consistency.
+            'Post URL': { t: 's', v: 'N/A' }
+        }]
+    );
+    const instaWorksheet = XLSX.utils.json_to_sheet(instaDataForSheet);
+    instaWorksheet['!cols'] = [ { wch: 30 }, { wch: 60 }, { wch: 60 } ];
 
     // --- Create and Download Workbook ---
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, leadsWorksheet, 'Leads');
     XLSX.utils.book_append_sheet(workbook, newsWorksheet, 'Latest News');
+    XLSX.utils.book_append_sheet(workbook, instaWorksheet, 'Instagram Posts');
     XLSX.writeFile(workbook, 'leads.xlsx');
   };
   

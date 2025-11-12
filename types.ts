@@ -10,6 +10,11 @@ export interface NewsArticle {
   url: string;
 }
 
+export interface InstagramPost {
+  caption: string;
+  url: string;
+}
+
 export interface Lead {
   companyName: string;
   category: string;
@@ -27,6 +32,7 @@ export interface Lead {
   latestNews?: NewsArticle;
   latestIndiaNews?: NewsArticle;
   composedEmail?: string;
+  latestInstagramPosts?: InstagramPost[];
 }
 
 export interface SearchQuery {
@@ -37,6 +43,7 @@ export interface SearchQuery {
     searchPlatforms: string[];
     includeSimilarCompanies: boolean;
     composeEmail: boolean;
+    exclusionList: string;
 }
 
 export interface StoredSession {

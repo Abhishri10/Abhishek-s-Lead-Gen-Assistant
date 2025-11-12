@@ -31,6 +31,7 @@ const dataGatheringRules = `
     - competitors: An array of 2-3 main competitors.
     - latestNews: An object containing the 'title' and 'url' of the most recent, relevant general news article about the company (e.g. funding, product launch). The URL must be a direct link. If none, return an object with "N/A" for both title and url.
     - latestIndiaNews: An object containing the 'title' and 'url' of the most recent news, press release, or significant public statement specifically mentioning the company's interest, plans, or activities related to the Indian market. The URL must be a direct link. If no such specific news is found, return an object with "N/A" for both title and url.
+    - latestInstagramPosts: An array of up to 5 of the company's most recent Instagram posts. Each object in the array should contain 'caption' and 'url' (direct link to the post). If no Instagram profile is found or there are no posts, return an empty array [].
 
 2.  **Contacts (Find up to 5 people in the specified department):**
     For each potential contact, you MUST perform this verification:
@@ -77,7 +78,8 @@ export const generateLeads = async (
     clientName: string,
     region: string,
     includeSimilar: boolean,
-    composeEmail: boolean
+    composeEmail: boolean,
+    exclusionList: string
 ): Promise<Lead[]> => {
   if ((!category.trim() && !clientName.trim()) || !department || platforms.length === 0) {
     return [];
@@ -85,13 +87,13 @@ export const generateLeads = async (
   
   let platformInstructions = '';
   if (platforms.includes('generalWeb')) {
-    platformInstructions += `- General Web Search: Look for news, press releases, or reports about international expansion, funding for emerging markets, or partnerships in the Asia-Pacific region.\n`;
+    platformInstructions += `- In-depth Web Search: Look for news, press releases, or reports about international expansion, funding for emerging markets, or partnerships in the Asia-Pacific region.\n`;
   }
   if (platforms.includes('linkedIn')) {
     platformInstructions += `- LinkedIn: Scan for companies posting jobs in India or showing increased engagement from Indian professionals.\n`;
   }
   if (platforms.includes('socialMedia')) {
-    platformInstructions += `- Social Media: Analyze mentions and discussions from Indian users to gauge organic market interest.\n`;
+    platformInstructions += `- Social Media (Facebook, X, Instagram, Reddit, etc.): Analyze mentions, discussions, and official posts from Indian users or related to Indian market interest to gauge organic engagement and expansion signals.\n`;
   }
   
   let taskDescription = '';
@@ -107,6 +109,10 @@ export const generateLeads = async (
         }
     } else {
         taskDescription = `Your task is to identify up to 10 international companies from the "${region}" region in the "${category}" category that are strong candidates for expanding into the Indian market. For each company, find contacts in the "${department}" department.`;
+    }
+
+    if (exclusionList.trim()) {
+      taskDescription += `\n\n**IMPORTANT EXCLUSION RULE:** You MUST NOT include any of the following companies in your results, even if they are a perfect match: ${exclusionList.trim()}.`;
     }
     
   let currentDataGatheringRules = dataGatheringRules;
@@ -124,7 +130,8 @@ export const generateLeads = async (
   "techStack": ["React", "Node.js", "Google Cloud"],
   "competitors": ["Competitor Inc", "Another Corp"],
   "latestNews": { "title": "Example Corp Raises $25M for Global Expansion", "url": "https://www.example.com/news/series-c" },
-  "latestIndiaNews": { "title": "Example Corp Partners with Indian Distributor", "url": "https://www.example.com/news/india-partnership" }`;
+  "latestIndiaNews": { "title": "Example Corp Partners with Indian Distributor", "url": "https://www.example.com/news/india-partnership" },
+  "latestInstagramPosts": [{ "caption": "Our new product launch!", "url": "https://www.instagram.com/p/Cxyz..." }, { "caption": "Team photo from the annual offsite!", "url": "https://www.instagram.com/p/Cabc..." }]`;
 
   if (composeEmail) {
     currentDataGatheringRules += `
@@ -181,10 +188,15 @@ ${jsonFormatInstructions}
 export const findLookalikeLeads = async (
     seedLead: Lead,
     region: string,
-    department: string
+    department: string,
+    exclusionList: string
 ): Promise<Lead[]> => {
     
-    const taskDescription = `Your task is to identify up to 5 international companies that are "lookalikes" of an existing lead, "${seedLead.companyName}". These new companies should also be from the "${region}" region and be strong candidates for expanding into the Indian market. Use the seed lead's category ("${seedLead.category}") and business model as a template. For each new company, find contacts in the "${department}" department.`;
+    let taskDescription = `Your task is to identify up to 5 international companies that are "lookalikes" of an existing lead, "${seedLead.companyName}". These new companies should also be from the "${region}" region and be strong candidates for expanding into the Indian market. Use the seed lead's category ("${seedLead.category}") and business model as a template. For each new company, find contacts in the "${department}" department.`;
+
+    if (exclusionList.trim()) {
+      taskDescription += `\n\n**IMPORTANT EXCLUSION RULE:** You MUST NOT include any of the following companies in your results, even if they are a perfect match: ${exclusionList.trim()}.`;
+    }
 
     const seedLeadInfo = `
 **Seed Lead Information for Reference:**
