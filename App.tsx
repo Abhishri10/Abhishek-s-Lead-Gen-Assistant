@@ -16,7 +16,7 @@ const SearchPlatformOptions = [
 
 const RegionOptions = ['Global', 'APAC', 'UK/Europe', 'USA', 'Canada', 'MENA', 'Africa'];
 const DepartmentOptions = ['Marketing', 'International Marketing', 'Sales', 'CEO', 'Business Head', 'COO'];
-const CategoryOptions = ['Food', 'Retail', 'Technology', 'Travel & Tourism', 'Gaming & Betting'];
+const CategoryOptions = ['Food', 'Retail', 'Technology', 'Travel & Tourism', 'Gaming & Betting', 'Education', 'Others'];
 const OutreachToneOptions = ['Default (Professional)', 'Formal', 'Casual & Friendly', 'Direct & Concise'];
 
 const SESSION_STORAGE_KEY = 'leadGenSession';
@@ -34,10 +34,11 @@ const loadingMessages = [
 
 const App: React.FC = () => {
   const [clientName, setClientName] = useState('');
-  const [category, setCategory] = useState(CategoryOptions[0]);
-  const [department, setDepartment] = useState(DepartmentOptions[0]);
-  const [region, setRegion] = useState(RegionOptions[0]);
-  const [searchPlatforms, setSearchPlatforms] = useState<string[]>(['generalWeb', 'linkedIn']);
+  const [category, setCategory] = useState('');
+  const [otherCategory, setOtherCategory] = useState('');
+  const [department, setDepartment] = useState('');
+  const [region, setRegion] = useState('');
+  const [searchPlatforms, setSearchPlatforms] = useState<string[]>([]);
   const [includeSimilarCompanies, setIncludeSimilarCompanies] = useState(false);
   const [generateOutreachCadence, setGenerateOutreachCadence] = useState(false);
   const [outreachTone, setOutreachTone] = useState(OutreachToneOptions[0]);
@@ -63,6 +64,11 @@ const App: React.FC = () => {
   const [isScoreExplanationLoading, setIsScoreExplanationLoading] = useState(false);
   const [scoreExplanationError, setScoreExplanationError] = useState<string | null>(null);
 
+  const getFinalCategory = useCallback(() => {
+    return category === 'Others' ? otherCategory.trim() : category;
+  }, [category, otherCategory]);
+
+
   useEffect(() => {
     try {
         const savedSession = localStorage.getItem(SESSION_STORAGE_KEY);
@@ -70,7 +76,17 @@ const App: React.FC = () => {
             const { leads: savedLeads, query } = JSON.parse(savedSession) as StoredSession;
             setLeads(savedLeads);
             setClientName(query.clientName);
-            setCategory(query.category);
+            
+            const savedCategory = query.category;
+            if (CategoryOptions.includes(savedCategory)) {
+                setCategory(savedCategory);
+            } else if (savedCategory) { // Custom category was saved
+                setCategory('Others');
+                setOtherCategory(savedCategory);
+            } else {
+                setCategory('');
+            }
+
             setDepartment(query.department);
             setRegion(query.region);
             setSearchPlatforms(query.searchPlatforms);
@@ -104,7 +120,7 @@ const App: React.FC = () => {
   const saveSession = (currentLeads: Lead[]) => {
       const session: StoredSession = {
           leads: currentLeads,
-          query: { clientName, category, department, region, searchPlatforms, includeSimilarCompanies, generateOutreachCadence, exclusionList, outreachTone }
+          query: { clientName, category: getFinalCategory(), department, region, searchPlatforms, includeSimilarCompanies, generateOutreachCadence, exclusionList, outreachTone }
       };
       localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
   }
@@ -112,10 +128,11 @@ const App: React.FC = () => {
   const handleClearSession = () => {
       setLeads([]);
       setClientName('');
-      setCategory(CategoryOptions[0]);
-      setDepartment(DepartmentOptions[0]);
-      setRegion(RegionOptions[0]);
-      setSearchPlatforms(['generalWeb', 'linkedIn']);
+      setCategory('');
+      setOtherCategory('');
+      setDepartment('');
+      setRegion('');
+      setSearchPlatforms([]);
       setIncludeSimilarCompanies(false);
       setGenerateOutreachCadence(false);
       setOutreachTone(OutreachToneOptions[0]);
@@ -128,15 +145,17 @@ const App: React.FC = () => {
     setIsLoading(true);
     setError(null);
     setLeads([]);
+    
+    const finalCategory = getFinalCategory();
 
-    if ((!category.trim() && !clientName.trim()) || searchPlatforms.length === 0) {
-      setError("Please provide a client name or category, and select at least one search platform.");
+    if ((!finalCategory && !clientName.trim()) || searchPlatforms.length === 0 || !department || !region) {
+      setError("Please fill all required fields: a client name or category, target department, region, and at least one search platform.");
       setIsLoading(false);
       return;
     }
 
     try {
-      const generated = await generateLeads(category, department, searchPlatforms, clientName, region, includeSimilarCompanies, generateOutreachCadence, exclusionList, outreachTone);
+      const generated = await generateLeads(finalCategory, department, searchPlatforms, clientName, region, includeSimilarCompanies, generateOutreachCadence, exclusionList, outreachTone);
       setLeads(generated);
       saveSession(generated);
     } catch (err) {
@@ -144,7 +163,7 @@ const App: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [category, department, searchPlatforms, clientName, region, includeSimilarCompanies, generateOutreachCadence, exclusionList, outreachTone]);
+  }, [getFinalCategory, department, searchPlatforms, clientName, region, includeSimilarCompanies, generateOutreachCadence, exclusionList, outreachTone]);
 
   const handleFindLookalikes = useCallback(async (seedLead: Lead, index: number) => {
     setIsLookalikeLoading(index);
@@ -206,6 +225,8 @@ const App: React.FC = () => {
     setScoreExplanation(null);
     setScoreExplanationError(null);
   };
+
+  const isFormInvalid = (!getFinalCategory() && !clientName.trim()) || !department || !region || searchPlatforms.length === 0;
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-200 flex flex-col items-center p-4 sm:p-6 lg:p-8">
@@ -283,10 +304,27 @@ const App: React.FC = () => {
                 id="category"
                 value={category}
                 onChange={(e) => setCategory(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-300"
+                className={`w-full bg-slate-900 border border-slate-600 rounded-lg p-3 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-300 ${!category ? 'text-slate-400' : ''}`}
               >
+                <option value="" disabled>Select the Category</option>
                 {CategoryOptions.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
+              {category === 'Others' && (
+                <div className="mt-3">
+                  <label htmlFor="otherCategory" className="block text-xs font-semibold mb-1 text-slate-400">
+                      Please specify category
+                  </label>
+                  <input
+                      id="otherCategory"
+                      type="text"
+                      value={otherCategory}
+                      onChange={(e) => setOtherCategory(e.target.value)}
+                      className="w-full bg-slate-700 border border-slate-600 rounded-lg p-2 text-sm focus:ring-1 focus:ring-purple-500 focus:border-purple-500 transition-all duration-300 placeholder-slate-500"
+                      placeholder="e.g., Sustainable Fashion"
+                      required
+                  />
+                </div>
+              )}
             </div>
             <div>
               <label htmlFor="department" className="block text-sm font-semibold mb-2 text-slate-300">
@@ -296,8 +334,9 @@ const App: React.FC = () => {
                 id="department"
                 value={department}
                 onChange={(e) => setDepartment(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-300"
+                className={`w-full bg-slate-900 border border-slate-600 rounded-lg p-3 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-300 ${!department ? 'text-slate-400' : ''}`}
               >
+                <option value="" disabled>Select the Department</option>
                 {DepartmentOptions.map(d => <option key={d} value={d}>{d}</option>)}
               </select>
             </div>
@@ -376,8 +415,9 @@ const App: React.FC = () => {
                 id="region"
                 value={region}
                 onChange={(e) => setRegion(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-300"
+                className={`w-full bg-slate-900 border border-slate-600 rounded-lg p-3 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-300 ${!region ? 'text-slate-400' : ''}`}
               >
+                <option value="" disabled>Select the Region</option>
                 {RegionOptions.map(r => <option key={r} value={r}>{r}</option>)}
               </select>
             </div>
@@ -393,7 +433,7 @@ const App: React.FC = () => {
             </button>
             <button
               onClick={handleGenerateLeads}
-              disabled={isLoading || isLookalikeLoading !== null || (!category.trim() && !clientName.trim()) || searchPlatforms.length === 0}
+              disabled={isLoading || isLookalikeLoading !== null || isFormInvalid}
               className="inline-flex items-center justify-center gap-2 px-8 py-3 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg shadow-lg transform hover:scale-105 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:scale-100"
             >
               {isLoading ? (

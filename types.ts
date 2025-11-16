@@ -34,6 +34,11 @@ export interface CompetitorAnalysis {
     recentNews: NewsArticle;
 }
 
+export interface PainPoint {
+    painPoint: string;
+    suggestedSolution: string;
+}
+
 export interface Lead {
   companyName: string;
   category: string;
@@ -50,6 +55,8 @@ export interface Lead {
   techStack: string[];
   competitors: string[];
   swotAnalysis: SWOT;
+  painPointAnalysis?: PainPoint[];
+  instagramProfileUrl?: string;
   latestNews?: NewsArticle;
   latestIndiaNews?: NewsArticle;
   outreachCadence?: OutreachStep[];

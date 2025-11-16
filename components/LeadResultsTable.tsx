@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import type { Lead } from '../types';
-import { LinkedInIcon, DownloadIcon, GoogleSheetsIcon, SparklesIcon, ChevronDownIcon, SignalIcon, SearchIcon, ClipboardIcon, CheckIcon, QuestionMarkCircleIcon } from './Icons';
+import { LinkedInIcon, InstagramIcon, DownloadIcon, GoogleSheetsIcon, SparklesIcon, ChevronDownIcon, SignalIcon, SearchIcon, ClipboardIcon, CheckIcon, QuestionMarkCircleIcon, TargetIcon, LightbulbIcon } from './Icons';
 
 declare var XLSX: any;
 
@@ -14,7 +14,7 @@ interface LeadResultsTableProps {
   onExplainScore: (lead: Lead) => void;
 }
 
-const isLinkable = (url: string) => url && url !== 'Not found' && url.startsWith('http');
+const isLinkable = (url?: string): url is string => !!url && url !== 'Not found' && url.startsWith('http');
 
 const getScoreColor = (score: number) => {
   if (score > 75) return 'bg-green-600';
@@ -117,6 +117,32 @@ const DeepDivePanel: React.FC<{ lead: Lead; onAnalyzeCompetitor: (competitorName
             </div>
         </div>
     )}
+
+    {lead.painPointAnalysis && lead.painPointAnalysis.length > 0 && (
+      <div className="col-span-2 md:col-span-4 mt-2">
+        <h4 className="font-semibold text-slate-400 uppercase mb-2">Potential Pain Points & Solutions</h4>
+        <div className="space-y-3">
+          {lead.painPointAnalysis.map((item, index) => (
+            <div key={index} className="bg-slate-800/50 p-3 rounded">
+              <div className="flex items-start gap-3 mb-2">
+                <TargetIcon className="w-5 h-5 shrink-0 text-red-400 mt-0.5" />
+                <div>
+                  <h5 className="font-bold text-red-400">Pain Point</h5>
+                  <p className="text-slate-300">{item.painPoint}</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 border-t border-slate-700/50 pt-2">
+                <LightbulbIcon className="w-5 h-5 shrink-0 text-yellow-400 mt-0.5" />
+                <div>
+                  <h5 className="font-bold text-yellow-400">Suggested Solution</h5>
+                  <p className="text-slate-300">{item.suggestedSolution}</p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    )}
     
     <OutreachCadencePanel lead={lead} />
 
@@ -167,14 +193,21 @@ const LeadCompanyGroup: React.FC<{
                                 </div>
                             </td>
                             <td className="px-6 py-4 font-medium text-white whitespace-nowrap align-top" rowSpan={rowSpan}>
-                                {isLinkable(lead.companyLinkedIn) ? (
-                                    <a href={lead.companyLinkedIn} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 group">
+                                <div className="flex items-center gap-2">
                                     <span>{lead.companyName}</span>
-                                    <LinkedInIcon className="w-4 h-4 text-slate-400 group-hover:text-cyan-400 transition-colors" />
-                                    </a>
-                                ) : (
-                                    <span>{lead.companyName}</span>
-                                )}
+                                    <div className="flex items-center gap-1.5">
+                                        {isLinkable(lead.companyLinkedIn) && (
+                                            <a href={lead.companyLinkedIn} target="_blank" rel="noopener noreferrer" className="group" title="LinkedIn Profile">
+                                                <LinkedInIcon className="w-4 h-4 text-slate-400 group-hover:text-cyan-400 transition-colors" />
+                                            </a>
+                                        )}
+                                        {isLinkable(lead.instagramProfileUrl) && (
+                                            <a href={lead.instagramProfileUrl} target="_blank" rel="noopener noreferrer" className="group" title="Instagram Profile">
+                                                <InstagramIcon className="w-4 h-4 text-slate-400 group-hover:text-pink-400 transition-colors" />
+                                            </a>
+                                        )}
+                                    </div>
+                                </div>
                             </td>
                             <td className="px-6 py-4 align-top" rowSpan={rowSpan}>{lead.category}</td>
                              <td className="px-6 py-4 max-w-sm align-top" rowSpan={rowSpan}>
@@ -263,7 +296,7 @@ const LeadResultsTable: React.FC<LeadResultsTableProps> = ({ leads, region, onFi
         headers.push('AI Cadence Step 1 Subject', 'AI Cadence Step 1 Body', 'AI Cadence Step 2 Subject', 'AI Cadence Step 2 Body');
     }
 
-    headers.push('Employee Count', 'Latest Funding', 'Tech Stack', 'Company LinkedIn', 'Contact LinkedIn');
+    headers.push('Employee Count', 'Latest Funding', 'Tech Stack', 'Company LinkedIn', 'Contact LinkedIn', 'Instagram Profile');
 
     const rows = flattenedLeads.map(lead => {
         const rowData = [
@@ -296,7 +329,8 @@ const LeadResultsTable: React.FC<LeadResultsTableProps> = ({ leads, region, onFi
             `"${(lead.latestFunding || '').replace(/"/g, '""')}"`,
             `"${(lead.techStack?.join(', ') || '').replace(/"/g, '""')}"`,
             `"${(lead.companyLinkedIn || '').replace(/"/g, '""')}"`,
-            `"${(lead.contactLinkedIn || '').replace(/"/g, '""')}"`
+            `"${(lead.contactLinkedIn || '').replace(/"/g, '""')}"`,
+            `"${(lead.instagramProfileUrl || '').replace(/"/g, '""')}"`
         );
 
         return rowData.join(',');
@@ -342,8 +376,9 @@ const LeadResultsTable: React.FC<LeadResultsTableProps> = ({ leads, region, onFi
         'Employee Count': lead.employeeCount,
         'Latest Funding': lead.latestFunding,
         'Tech Stack': lead.techStack?.join(', '),
-        'Company LinkedIn': { t: 's', v: 'Link', l: { Target: lead.companyLinkedIn, Tooltip: lead.companyLinkedIn } },
+        'Company LinkedIn': isLinkable(lead.companyLinkedIn) ? { t: 's', v: 'Link', l: { Target: lead.companyLinkedIn, Tooltip: lead.companyLinkedIn } } : 'N/A',
         'Contact LinkedIn': isLinkable(lead.contactLinkedIn) ? { t: 's', v: 'Link', l: { Target: lead.contactLinkedIn, Tooltip: lead.contactLinkedIn } } : 'Not found',
+        'Instagram Profile': isLinkable(lead.instagramProfileUrl) ? { t: 's', v: 'Link', l: { Target: lead.instagramProfileUrl, Tooltip: lead.instagramProfileUrl } } : 'N/A',
     }));
     const leadsWorksheet = XLSX.utils.json_to_sheet(leadsDataForSheet);
     XLSX.utils.book_append_sheet(workbook, leadsWorksheet, 'Leads');
@@ -360,7 +395,21 @@ const LeadResultsTable: React.FC<LeadResultsTableProps> = ({ leads, region, onFi
     swotWorksheet['!cols'] = [ { wch: 30 }, { wch: 50 }, { wch: 50 }, { wch: 50 }, { wch: 50 } ];
     XLSX.utils.book_append_sheet(workbook, swotWorksheet, 'SWOT Analysis');
 
-    // --- Sheet 3: Outreach Cadence ---
+    // --- Sheet 3: Pain Point Analysis ---
+    if (leads.some(l => l.painPointAnalysis && l.painPointAnalysis.length > 0)) {
+        const painPointDataForSheet = leads.flatMap(lead => 
+            lead.painPointAnalysis?.map(item => ({
+                'Company Name': lead.companyName,
+                'Pain Point': item.painPoint,
+                'Suggested Solution': item.suggestedSolution,
+            })) || []
+        );
+        const painPointWorksheet = XLSX.utils.json_to_sheet(painPointDataForSheet);
+        painPointWorksheet['!cols'] = [ { wch: 30 }, { wch: 60 }, { wch: 60 } ];
+        XLSX.utils.book_append_sheet(workbook, painPointWorksheet, 'Pain Point Analysis');
+    }
+
+    // --- Sheet 4: Outreach Cadence ---
     if (leads.some(l => l.outreachCadence && l.outreachCadence.length > 0)) {
         const cadenceDataForSheet = leads.flatMap(lead => 
             lead.outreachCadence?.map(step => ({
@@ -375,7 +424,7 @@ const LeadResultsTable: React.FC<LeadResultsTableProps> = ({ leads, region, onFi
         XLSX.utils.book_append_sheet(workbook, cadenceWorksheet, 'Outreach Cadence');
     }
 
-    // --- Sheet 4: Latest News ---
+    // --- Sheet 5: Latest News ---
     const newsDataForSheet = leads.map(lead => ({
       'Company Name': lead.companyName,
       'Latest News': (lead.latestNews && isLinkable(lead.latestNews.url)) ? { t: 's', v: lead.latestNews.title, l: { Target: lead.latestNews.url, Tooltip: `Click to open article` } } : 'N/A',
@@ -385,7 +434,7 @@ const LeadResultsTable: React.FC<LeadResultsTableProps> = ({ leads, region, onFi
     newsWorksheet['!cols'] = [ { wch: 30 }, { wch: 60 }, { wch: 60 } ];
     XLSX.utils.book_append_sheet(workbook, newsWorksheet, 'Latest News');
 
-    // --- Sheet 5: Instagram Posts ---
+    // --- Sheet 6: Instagram Posts ---
     const instaDataForSheet = leads.flatMap(lead => 
         (lead.latestInstagramPosts && lead.latestInstagramPosts.length > 0) 
         ? lead.latestInstagramPosts.map(post => ({

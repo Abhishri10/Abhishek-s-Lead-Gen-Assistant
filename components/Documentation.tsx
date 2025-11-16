@@ -98,17 +98,20 @@ Your primary task is a deep-dive investigation into the company "InnovateTech" i
     - category: Company's industry.
     - email: Find a public contact email from the company's official site. Use "N/A" if none.
     - phone: Find a public phone number from the company's official site. Use "N/A" if none.
-    - justification: A brief, detailed reason why this company is a strong lead for Indian market expansion, citing specific evidence.
+    - justification: A brief, high-level summary (2-3 sentences) of why this company is a strong lead for Indian market expansion.
+    - marketEntrySignals: An array of 3-5 specific, verifiable bullet points that support the justification (e.g., "Recent $50M funding for global expansion", "Job posting for Head of Sales, India", "CEO mentioned APAC focus in a recent podcast").
     - leadScore: A numerical score from 1-100 indicating the strength of the lead, where 100 is the strongest. Base this on the recency and relevance of their expansion signals (e.g., recent funding, job postings, official announcements).
-    - outreachSuggestion: A single, compelling sentence to use as a personalized icebreaker in an outreach email, directly referencing the 'justification'.
+    - outreachSuggestion: A single, compelling sentence to use as a personalized icebreaker in an outreach email, directly referencing the 'justification' and 'marketEntrySignals'.
     - employeeCount: Estimated number of employees (e.g., "51-200").
     - latestFunding: Details of the most recent funding round (e.g., "$50M Series B - Oct 2023"). Use "N/A" if not found.
     - techStack: An array of key technologies the company uses (e.g., ["Salesforce", "AWS", "Shopify"]).
     - competitors: An array of 2-3 main competitors.
+    - swotAnalysis: An object with four arrays of strings: 'strengths', 'weaknesses', 'opportunities', and 'threats'. Each array should contain 2-3 brief bullet points analyzing the company's potential for Indian market entry.
+    - painPointAnalysis: An array of 2-3 potential business pain points. For each, identify a specific 'painPoint' the company likely faces (based on SWOT analysis, industry trends, or recent news) and a 'suggestedSolution' which is a one-sentence pitch on how your service could solve it.
     - latestNews: An object containing the 'title' and 'url' of the most recent, relevant general news article about the company (e.g. funding, product launch). The URL must be a direct link. If none, return an object with "N/A" for both title and url.
     - latestIndiaNews: An object containing the 'title' and 'url' of the most recent news, press release, or significant public statement specifically mentioning the company's interest, plans, or activities related to the Indian market. The URL must be a direct link. If no such specific news is found, return an object with "N/A" for both title and url.
-    - latestInstagramPosts: An array of up to 5 of the company's most recent Instagram posts. Each object in the array should contain 'caption' and 'url' (direct link to the post). If no Instagram profile is found or there are no posts, return an empty array [].
-    - composedEmail: A full, personalized, and professional outreach email (3-4 paragraphs) ready to send. It should be friendly, concise, and professional. Start with the 'outreachSuggestion' as an opener, briefly expand on the 'justification' to show you've done your research, explain the value proposition for Indian expansion, and end with a clear, low-friction call-to-action (e.g., "Would you be open to a brief 15-minute call next week to explore this further?"). The email should be addressed to the primary contact you've identified.
+    - instagramProfileUrl: The full URL to the company's official Instagram profile. Use "N/A" if not found.
+    - latestInstagramPosts: An array of up to 5 of the company's most recent Instagram posts. Each object in the array should contain 'caption' and 'url'. The 'url' MUST be a direct, publicly accessible link to the specific post (e.g., https://www.instagram.com/p/Cxyz...). If you can find the post's caption but not its specific URL, use the main instagramProfileUrl as the post's URL. If no profile is found, return an empty array [].
 
 2.  **Contacts (Find up to 5 people in the specified department):**
     For each potential contact, you MUST perform this verification:
@@ -135,7 +138,8 @@ Your entire response MUST be a single, valid JSON array of lead objects. Do NOT 
   "companyName": "Example Corp",
   "category": "Technology",
   "companyLinkedIn": "https://www.linkedin.com/company/example-corp",
-  "justification": "Recent press release mentioned plans for APAC expansion.",
+  "justification": "Recent press releases and a new funding round strongly indicate a push towards global expansion, with APAC being a specifically mentioned target market.",
+  "marketEntrySignals": ["Raised $25M Series C for 'global expansion'", "Job posting for 'Business Development Manager, APAC'", "Partnered with a logistics firm in Singapore"],
   "email": "contact@example.com",
   "phone": "+1-555-123-4567",
   "leadScore": 85,
@@ -144,10 +148,26 @@ Your entire response MUST be a single, valid JSON array of lead objects. Do NOT 
   "latestFunding": "$25M Series C - Jan 2024",
   "techStack": ["React", "Node.js", "Google Cloud"],
   "competitors": ["Competitor Inc", "Another Corp"],
+  "swotAnalysis": {
+      "strengths": ["Strong brand recognition", "Innovative product line"],
+      "weaknesses": ["No existing physical presence in Asia", "Pricing may be high for the Indian market"],
+      "opportunities": ["Large untapped consumer base in India", "Growing demand for high-tech solutions"],
+      "threats": ["Intense local competition", "Complex regulatory landscape"]
+  },
+  "painPointAnalysis": [
+      {
+          "painPoint": "Difficulty navigating complex Indian import regulations, potentially delaying market entry.",
+          "suggestedSolution": "Our local logistics expertise can streamline your customs clearance process, ensuring a faster launch."
+      },
+      {
+          "painPoint": "High customer acquisition costs in a competitive, price-sensitive market.",
+          "suggestedSolution": "We can help you implement a targeted digital marketing strategy that lowers your cost-per-lead by up to 30%."
+      }
+  ],
   "latestNews": { "title": "Example Corp Raises $25M for Global Expansion", "url": "https://www.example.com/news/series-c" },
   "latestIndiaNews": { "title": "Example Corp Partners with Indian Distributor", "url": "https://www.example.com/news/india-partnership" },
+  "instagramProfileUrl": "https://www.instagram.com/examplecorp",
   "latestInstagramPosts": [{ "caption": "Our new product launch!", "url": "https://www.instagram.com/p/Cxyz..." }, { "caption": "Team photo from the annual offsite!", "url": "https://www.instagram.com/p/Cabc..." }],
-  "composedEmail": "Subject: Exploring Example Corp's Expansion into India\\n\\nHi Jane Doe,\\n\\nI saw your recent press release about expanding into the APAC region and was very impressed with your growth. Given your focus on global markets, the Indian market seems like a significant opportunity for Example Corp.\\n\\nMy company specializes in helping Technology companies like yours successfully launch in India, navigating the unique market landscape to drive rapid growth.\\n\\nWould you be open to a brief 15-minute call next week to explore how we could support your potential expansion?\\n\\nBest regards,\\n[Your Name]",
   "contacts": [
     { "contactName": "Jane Doe", "designation": "VP of Marketing", "contactLinkedIn": "https://www.linkedin.com/in/janedoe-example" },
     { "contactName": "John Smith", "designation": "Marketing Director", "contactLinkedIn": "Not found" }

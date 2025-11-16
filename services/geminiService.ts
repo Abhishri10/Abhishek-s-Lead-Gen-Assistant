@@ -31,9 +31,11 @@ const dataGatheringRules = `
     - techStack: An array of key technologies the company uses (e.g., ["Salesforce", "AWS", "Shopify"]).
     - competitors: An array of 2-3 main competitors.
     - swotAnalysis: An object with four arrays of strings: 'strengths', 'weaknesses', 'opportunities', and 'threats'. Each array should contain 2-3 brief bullet points analyzing the company's potential for Indian market entry.
+    - painPointAnalysis: An array of 2-3 potential business pain points. For each, identify a specific 'painPoint' the company likely faces (based on SWOT analysis, industry trends, or recent news) and a 'suggestedSolution' which is a one-sentence pitch on how your service could solve it.
     - latestNews: An object containing the 'title' and 'url' of the most recent, relevant general news article about the company (e.g. funding, product launch). The URL must be a direct link. If none, return an object with "N/A" for both title and url.
     - latestIndiaNews: An object containing the 'title' and 'url' of the most recent news, press release, or significant public statement specifically mentioning the company's interest, plans, or activities related to the Indian market. The URL must be a direct link. If no such specific news is found, return an object with "N/A" for both title and url.
-    - latestInstagramPosts: An array of up to 5 of the company's most recent Instagram posts. Each object in the array should contain 'caption' and 'url' (direct link to the post). If no Instagram profile is found or there are no posts, return an empty array [].
+    - instagramProfileUrl: The full URL to the company's official Instagram profile. Use "N/A" if not found.
+    - latestInstagramPosts: An array of up to 5 of the company's most recent Instagram posts. Each object in the array should contain 'caption' and 'url'. The 'url' MUST be a direct, publicly accessible link to the specific post (e.g., https://www.instagram.com/p/Cxyz...). If you can find the post's caption but not its specific URL, use the main instagramProfileUrl as the post's URL. If no profile is found, return an empty array [].
 
 2.  **Contacts (Find up to 5 people in the specified department):**
     For each potential contact, you MUST perform this verification:
@@ -144,8 +146,19 @@ export const generateLeads = async (
       "opportunities": ["Large untapped consumer base in India", "Growing demand for high-tech solutions"],
       "threats": ["Intense local competition", "Complex regulatory landscape"]
   },
+  "painPointAnalysis": [
+      {
+          "painPoint": "Difficulty navigating complex Indian import regulations, potentially delaying market entry.",
+          "suggestedSolution": "Our local logistics expertise can streamline your customs clearance process, ensuring a faster launch."
+      },
+      {
+          "painPoint": "High customer acquisition costs in a competitive, price-sensitive market.",
+          "suggestedSolution": "We can help you implement a targeted digital marketing strategy that lowers your cost-per-lead by up to 30%."
+      }
+  ],
   "latestNews": { "title": "Example Corp Raises $25M for Global Expansion", "url": "https://www.example.com/news/series-c" },
   "latestIndiaNews": { "title": "Example Corp Partners with Indian Distributor", "url": "https://www.example.com/news/india-partnership" },
+  "instagramProfileUrl": "https://www.instagram.com/examplecorp",
   "latestInstagramPosts": [{ "caption": "Our new product launch!", "url": "https://www.instagram.com/p/Cxyz..." }, { "caption": "Team photo from the annual offsite!", "url": "https://www.instagram.com/p/Cabc..." }]`;
 
   if (generateOutreachCadence) {
