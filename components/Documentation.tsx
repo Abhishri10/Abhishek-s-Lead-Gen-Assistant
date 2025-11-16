@@ -115,7 +115,7 @@ Your primary task is a deep-dive investigation into the company "InnovateTech" i
     1. Find their LinkedIn profile using a targeted search.
     2. **Verify (ALL MUST BE TRUE):**
         a. **Company:** Current company on LinkedIn EXACTLY matches the researched company.
-        b. **Region:** LinkedIn location is CONSISTENT with the target region.
+        b. **Strict Region Match:** The contact's location listed on their LinkedIn profile MUST be within the specified search region. For instance, if the target region is 'UK/Europe', the contact's location must be in a country within the UK or Europe. This is a non-negotiable rule. If a contact's location is outside the target region, you MUST DISCARD them and find another contact who is located within the region.
         c. **Role:** Job title matches the target department.
     3. **Result:**
         - **MANDATORY:** If a contact is VERIFIED, you MUST provide their full, valid LinkedIn profile URL for the 'contactLinkedIn' field. It cannot be empty.

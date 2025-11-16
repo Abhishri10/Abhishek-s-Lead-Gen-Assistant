@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
-import type { Lead, Contact } from '../types';
-import { LinkedInIcon, DownloadIcon, GoogleSheetsIcon, SparklesIcon, ChevronDownIcon } from './Icons';
+import type { Lead } from '../types';
+import { LinkedInIcon, DownloadIcon, GoogleSheetsIcon, SparklesIcon, ChevronDownIcon, SignalIcon, SearchIcon, ClipboardIcon, CheckIcon, QuestionMarkCircleIcon } from './Icons';
 
 declare var XLSX: any;
 
@@ -10,6 +10,8 @@ interface LeadResultsTableProps {
   region: string;
   onFindLookalikes: (seedLead: Lead, index: number) => void;
   isLookalikeLoading: number | null;
+  onAnalyzeCompetitor: (competitorName: string, leadContext: Lead) => void;
+  onExplainScore: (lead: Lead) => void;
 }
 
 const isLinkable = (url: string) => url && url !== 'Not found' && url.startsWith('http');
@@ -20,8 +22,50 @@ const getScoreColor = (score: number) => {
   return 'bg-red-600';
 };
 
-const DeepDivePanel: React.FC<{ lead: Lead }> = ({ lead }) => (
-  <div className="bg-slate-900/50 p-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-xs">
+const OutreachCadencePanel: React.FC<{ lead: Lead }> = ({ lead }) => {
+    const [activeTab, setActiveTab] = useState(0);
+    const [copiedStates, setCopiedStates] = useState<Record<number, boolean>>({});
+
+    const handleCopy = (text: string, index: number) => {
+        navigator.clipboard.writeText(text);
+        setCopiedStates({ ...copiedStates, [index]: true });
+        setTimeout(() => setCopiedStates({ ...copiedStates, [index]: false }), 2000);
+    };
+
+    if (!lead.outreachCadence || lead.outreachCadence.length === 0) {
+        return null;
+    }
+
+    return (
+        <div className="col-span-2 md:col-span-4">
+            <h4 className="font-semibold text-slate-400 uppercase mb-2">AI Outreach Cadence</h4>
+            <div className="flex border-b border-slate-700">
+                {lead.outreachCadence.map((step, index) => (
+                    <button 
+                        key={step.step} 
+                        onClick={() => setActiveTab(index)}
+                        className={`px-4 py-2 text-sm font-medium transition-colors ${activeTab === index ? 'border-b-2 border-purple-400 text-white' : 'text-slate-400 hover:bg-slate-700/50'}`}
+                    >
+                        Step {step.step}
+                    </button>
+                ))}
+            </div>
+            <div className="p-4 bg-slate-800/50 rounded-b-md">
+                <div className="font-semibold text-slate-200 mb-2">Subject: {lead.outreachCadence[activeTab].subject}</div>
+                <div className="whitespace-pre-wrap text-slate-300 text-xs relative">
+                    {lead.outreachCadence[activeTab].body}
+                    <button onClick={() => handleCopy(lead.outreachCadence[activeTab].body, activeTab)} className="absolute top-0 right-0 p-1 text-slate-400 hover:text-white transition-colors" title="Copy Body">
+                        {copiedStates[activeTab] ? <CheckIcon className="w-4 h-4 text-green-400" /> : <ClipboardIcon className="w-4 h-4" />}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+
+const DeepDivePanel: React.FC<{ lead: Lead; onAnalyzeCompetitor: (competitorName: string, leadContext: Lead) => void; }> = ({ lead, onAnalyzeCompetitor }) => (
+  <div className="bg-slate-900/50 p-4 grid grid-cols-2 md:grid-cols-4 gap-6 text-xs">
     <div>
       <h4 className="font-semibold text-slate-400 uppercase mb-1">Employee Count</h4>
       <p className="text-slate-200">{lead.employeeCount}</p>
@@ -38,10 +82,44 @@ const DeepDivePanel: React.FC<{ lead: Lead }> = ({ lead }) => (
     </div>
     <div>
       <h4 className="font-semibold text-slate-400 uppercase mb-1">Competitors</h4>
-      <div className="flex flex-wrap gap-1">
-        {lead.competitors?.map(comp => <span key={comp} className="bg-indigo-800 text-indigo-200 px-2 py-0.5 rounded font-bold">{comp}</span>)}
+      <div className="flex flex-col gap-1">
+        {lead.competitors?.map(comp => (
+            <div key={comp} className="flex items-center justify-between bg-indigo-800 text-indigo-200 px-2 py-0.5 rounded font-bold">
+                <span>{comp}</span>
+                 <button onClick={() => onAnalyzeCompetitor(comp, lead)} className="p-0.5 hover:bg-indigo-600 rounded-full" title={`Analyze ${comp}`}>
+                    <SearchIcon className="w-3 h-3"/>
+                 </button>
+            </div>
+        ))}
       </div>
     </div>
+
+    {lead.swotAnalysis && (
+        <div className="col-span-2 md:col-span-4 mt-2">
+            <h4 className="font-semibold text-slate-400 uppercase mb-2">SWOT Analysis (India Market Entry)</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="bg-slate-800/50 p-3 rounded">
+                    <h5 className="font-bold text-green-400 mb-1">Strengths 💪</h5>
+                    <ul className="list-disc list-inside space-y-1">{lead.swotAnalysis.strengths.map(s => <li key={s}>{s}</li>)}</ul>
+                </div>
+                <div className="bg-slate-800/50 p-3 rounded">
+                    <h5 className="font-bold text-yellow-400 mb-1">Weaknesses ⚠️</h5>
+                    <ul className="list-disc list-inside space-y-1">{lead.swotAnalysis.weaknesses.map(w => <li key={w}>{w}</li>)}</ul>
+                </div>
+                <div className="bg-slate-800/50 p-3 rounded">
+                    <h5 className="font-bold text-sky-400 mb-1">Opportunities 🚀</h5>
+                    <ul className="list-disc list-inside space-y-1">{lead.swotAnalysis.opportunities.map(o => <li key={o}>{o}</li>)}</ul>
+                </div>
+                <div className="bg-slate-800/50 p-3 rounded">
+                    <h5 className="font-bold text-red-400 mb-1">Threats 🛡️</h5>
+                    <ul className="list-disc list-inside space-y-1">{lead.swotAnalysis.threats.map(t => <li key={t}>{t}</li>)}</ul>
+                </div>
+            </div>
+        </div>
+    )}
+    
+    <OutreachCadencePanel lead={lead} />
+
     {lead.latestInstagramPosts && lead.latestInstagramPosts.length > 0 && (
         <div className="col-span-2 md:col-span-4">
             <h4 className="font-semibold text-slate-400 uppercase mb-2">Latest Instagram Posts</h4>
@@ -62,7 +140,9 @@ const LeadCompanyGroup: React.FC<{
     lead: Lead;
     onFindLookalike: () => void;
     isLookalikeLoading: boolean;
-}> = ({ lead, onFindLookalike, isLookalikeLoading }) => {
+    onAnalyzeCompetitor: (competitorName: string, leadContext: Lead) => void;
+    onExplainScore: (lead: Lead) => void;
+}> = ({ lead, onFindLookalike, isLookalikeLoading, onAnalyzeCompetitor, onExplainScore }) => {
     const [isExpanded, setIsExpanded] = useState(false);
     const contactsToShow = (lead.contacts && lead.contacts.length > 0) 
         ? lead.contacts 
@@ -76,12 +156,17 @@ const LeadCompanyGroup: React.FC<{
                 <tr key={`${lead.companyName}-${contact.contactName}-${contactIndex}`} className="border-b border-slate-700 hover:bg-slate-700/50 transition-colors duration-200">
                     {contactIndex === 0 && (
                         <>
-                            <td className="px-4 py-4 text-center" rowSpan={rowSpan}>
-                                <span className={`px-2.5 py-1 text-xs font-semibold text-white rounded-full ${getScoreColor(lead.leadScore)}`}>
-                                    {lead.leadScore}
-                                </span>
+                            <td className="px-4 py-4 text-center align-top" rowSpan={rowSpan}>
+                                <div className="flex items-center justify-center gap-1">
+                                    <span className={`px-2.5 py-1 text-xs font-semibold text-white rounded-full ${getScoreColor(lead.leadScore)}`}>
+                                        {lead.leadScore}
+                                    </span>
+                                    <button onClick={() => onExplainScore(lead)} className="p-0.5 text-slate-400 hover:text-white rounded-full transition-colors" title="Why this score?">
+                                        <QuestionMarkCircleIcon className="w-4 h-4" />
+                                    </button>
+                                </div>
                             </td>
-                            <td className="px-6 py-4 font-medium text-white whitespace-nowrap" rowSpan={rowSpan}>
+                            <td className="px-6 py-4 font-medium text-white whitespace-nowrap align-top" rowSpan={rowSpan}>
                                 {isLinkable(lead.companyLinkedIn) ? (
                                     <a href={lead.companyLinkedIn} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 group">
                                     <span>{lead.companyName}</span>
@@ -91,13 +176,23 @@ const LeadCompanyGroup: React.FC<{
                                     <span>{lead.companyName}</span>
                                 )}
                             </td>
-                            <td className="px-6 py-4" rowSpan={rowSpan}>{lead.category}</td>
-                             <td className="px-6 py-4 max-w-sm" rowSpan={rowSpan}>
+                            <td className="px-6 py-4 align-top" rowSpan={rowSpan}>{lead.category}</td>
+                             <td className="px-6 py-4 max-w-sm align-top" rowSpan={rowSpan}>
                                 <p className="font-medium text-slate-200">{lead.justification}</p>
+                                {lead.marketEntrySignals && lead.marketEntrySignals.length > 0 && (
+                                    <ul className="mt-2 space-y-1">
+                                        {lead.marketEntrySignals.map((signal, i) => (
+                                            <li key={i} className="flex items-start gap-2 text-slate-300">
+                                                <SignalIcon className="w-4 h-4 mt-0.5 shrink-0 text-cyan-400" />
+                                                <span className="text-xs">{signal}</span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                )}
                                 {lead.outreachSuggestion && (
-                                    <div className="mt-2 flex items-start gap-2 text-purple-300">
+                                    <div className="mt-2 flex items-start gap-2 text-purple-300 border-t border-slate-700 pt-2">
                                     <SparklesIcon className="w-4 h-4 mt-0.5 shrink-0" />
-                                    <p className="text-sm italic">{lead.outreachSuggestion}</p>
+                                    <p className="text-sm italic">{`Icebreaker: "${lead.outreachSuggestion}"`}</p>
                                     </div>
                                 )}
                             </td>
@@ -116,9 +211,9 @@ const LeadCompanyGroup: React.FC<{
                     <td className="px-6 py-4">{contact.designation}</td>
                     {contactIndex === 0 && (
                         <>
-                           <td className="px-6 py-4" rowSpan={rowSpan}>{lead.email}</td>
-                           <td className="px-6 py-4" rowSpan={rowSpan}>{lead.phone}</td>
-                           <td className="px-4 py-4 text-center" rowSpan={rowSpan}>
+                           <td className="px-6 py-4 align-top" rowSpan={rowSpan}>{lead.email}</td>
+                           <td className="px-6 py-4 align-top" rowSpan={rowSpan}>{lead.phone}</td>
+                           <td className="px-4 py-4 text-center align-top" rowSpan={rowSpan}>
                              <div className="flex flex-col items-center gap-2">
                                 <button onClick={() => setIsExpanded(!isExpanded)} className="p-1 text-slate-400 hover:text-white transition-transform duration-200" style={{ transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)'}} title="Toggle Details">
                                     <ChevronDownIcon className="w-5 h-5"/>
@@ -135,7 +230,7 @@ const LeadCompanyGroup: React.FC<{
             {isExpanded && (
                 <tr className="border-b border-slate-600 bg-slate-800">
                     <td colSpan={9}>
-                        <DeepDivePanel lead={lead} />
+                        <DeepDivePanel lead={lead} onAnalyzeCompetitor={onAnalyzeCompetitor} />
                     </td>
                 </tr>
             )}
@@ -144,7 +239,7 @@ const LeadCompanyGroup: React.FC<{
 };
 
 
-const LeadResultsTable: React.FC<LeadResultsTableProps> = ({ leads, region, onFindLookalikes, isLookalikeLoading }) => {
+const LeadResultsTable: React.FC<LeadResultsTableProps> = ({ leads, region, onFindLookalikes, isLookalikeLoading, onAnalyzeCompetitor, onExplainScore }) => {
   const [copiedNotification, setCopiedNotification] = useState('');
 
   const getFlattenedLeads = () => leads.flatMap(lead =>
@@ -160,12 +255,12 @@ const LeadResultsTable: React.FC<LeadResultsTableProps> = ({ leads, region, onFi
     const flattenedLeads = getFlattenedLeads();
     const headers = [
         'Lead Score', 'Company Name', 'Region', 'Category', 'Contact Person', 'Designation', 'Email', 'Phone', 
-        'Intel', 'Icebreaker'
+        'Intel Summary', 'Market Entry Signals', 'Icebreaker'
     ];
     
-    const hasComposedEmail = leads.some(lead => lead.composedEmail);
-    if (hasComposedEmail) {
-        headers.push('AI Composed Email');
+    const hasOutreachCadence = leads.some(lead => lead.outreachCadence && lead.outreachCadence.length > 0);
+    if (hasOutreachCadence) {
+        headers.push('AI Cadence Step 1 Subject', 'AI Cadence Step 1 Body', 'AI Cadence Step 2 Subject', 'AI Cadence Step 2 Body');
     }
 
     headers.push('Employee Count', 'Latest Funding', 'Tech Stack', 'Company LinkedIn', 'Contact LinkedIn');
@@ -181,11 +276,19 @@ const LeadResultsTable: React.FC<LeadResultsTableProps> = ({ leads, region, onFi
             `"${(lead.email || '').replace(/"/g, '""')}"`,
             `"${(lead.phone || '').replace(/"/g, '""')}"`,
             `"${(lead.justification || '').replace(/"/g, '""')}"`,
+            `"${(lead.marketEntrySignals?.join('; ') || '').replace(/"/g, '""')}"`,
             `"${(lead.outreachSuggestion || '').replace(/"/g, '""')}"`
         ];
 
-        if (hasComposedEmail) {
-            rowData.push(`"${(lead.composedEmail || '').replace(/\n/g, ' ').replace(/"/g, '""')}"`);
+        if (hasOutreachCadence) {
+            const step1 = lead.outreachCadence?.[0];
+            const step2 = lead.outreachCadence?.[1];
+            rowData.push(
+                `"${(step1?.subject || '').replace(/"/g, '""')}"`,
+                `"${(step1?.body || '').replace(/\n/g, ' ').replace(/"/g, '""')}"`,
+                `"${(step2?.subject || '').replace(/"/g, '""')}"`,
+                `"${(step2?.body || '').replace(/\n/g, ' ').replace(/"/g, '""')}"`,
+            );
         }
         
         rowData.push(
@@ -220,77 +323,81 @@ const LeadResultsTable: React.FC<LeadResultsTableProps> = ({ leads, region, onFi
   };
 
   const downloadXLSX = () => {
+    const workbook = XLSX.utils.book_new();
+
     // --- Sheet 1: Leads Data ---
     const flattenedLeads = getFlattenedLeads();
-    const hasComposedEmail = leads.some(lead => lead.composedEmail);
-
-    const leadsDataForSheet = flattenedLeads.map(lead => {
-        const baseData = {
-            'Lead Score': lead.leadScore,
-            'Company Name': lead.companyName,
-            'Region': region,
-            'Category': lead.category,
-            'Contact Person': lead.contactName,
-            'Designation': lead.designation,
-            'Email': lead.email,
-            'Phone': lead.phone,
-            'Intel': lead.justification,
-            'Icebreaker': lead.outreachSuggestion,
-        };
-        const composedEmailData = hasComposedEmail ? { 'AI Composed Email': lead.composedEmail } : {};
-        const remainingData = {
-            'Employee Count': lead.employeeCount,
-            'Latest Funding': lead.latestFunding,
-            'Tech Stack': lead.techStack?.join(', '),
-            'Company LinkedIn': lead.companyLinkedIn,
-            'Contact LinkedIn': lead.contactLinkedIn,
-        };
-        return { ...baseData, ...composedEmailData, ...remainingData };
-    });
+    const leadsDataForSheet = flattenedLeads.map(lead => ({
+        'Lead Score': lead.leadScore,
+        'Company Name': lead.companyName,
+        'Region': region,
+        'Category': lead.category,
+        'Contact Person': lead.contactName,
+        'Designation': lead.designation,
+        'Email': lead.email,
+        'Phone': lead.phone,
+        'Intel Summary': lead.justification,
+        'Market Entry Signals': lead.marketEntrySignals?.join('\n'),
+        'Icebreaker': lead.outreachSuggestion,
+        'Employee Count': lead.employeeCount,
+        'Latest Funding': lead.latestFunding,
+        'Tech Stack': lead.techStack?.join(', '),
+        'Company LinkedIn': { t: 's', v: 'Link', l: { Target: lead.companyLinkedIn, Tooltip: lead.companyLinkedIn } },
+        'Contact LinkedIn': isLinkable(lead.contactLinkedIn) ? { t: 's', v: 'Link', l: { Target: lead.contactLinkedIn, Tooltip: lead.contactLinkedIn } } : 'Not found',
+    }));
     const leadsWorksheet = XLSX.utils.json_to_sheet(leadsDataForSheet);
+    XLSX.utils.book_append_sheet(workbook, leadsWorksheet, 'Leads');
 
-    // --- Sheet 2: Latest News ---
+    // --- Sheet 2: SWOT Analysis ---
+    const swotDataForSheet = leads.map(lead => ({
+        'Company Name': lead.companyName,
+        'Strengths': lead.swotAnalysis?.strengths?.join('\n'),
+        'Weaknesses': lead.swotAnalysis?.weaknesses?.join('\n'),
+        'Opportunities': lead.swotAnalysis?.opportunities?.join('\n'),
+        'Threats': lead.swotAnalysis?.threats?.join('\n'),
+    }));
+    const swotWorksheet = XLSX.utils.json_to_sheet(swotDataForSheet);
+    swotWorksheet['!cols'] = [ { wch: 30 }, { wch: 50 }, { wch: 50 }, { wch: 50 }, { wch: 50 } ];
+    XLSX.utils.book_append_sheet(workbook, swotWorksheet, 'SWOT Analysis');
+
+    // --- Sheet 3: Outreach Cadence ---
+    if (leads.some(l => l.outreachCadence && l.outreachCadence.length > 0)) {
+        const cadenceDataForSheet = leads.flatMap(lead => 
+            lead.outreachCadence?.map(step => ({
+                'Company Name': lead.companyName,
+                'Step': step.step,
+                'Subject': step.subject,
+                'Body': step.body,
+            })) || []
+        );
+        const cadenceWorksheet = XLSX.utils.json_to_sheet(cadenceDataForSheet);
+        cadenceWorksheet['!cols'] = [ { wch: 30 }, { wch: 5 }, { wch: 40 }, { wch: 80 } ];
+        XLSX.utils.book_append_sheet(workbook, cadenceWorksheet, 'Outreach Cadence');
+    }
+
+    // --- Sheet 4: Latest News ---
     const newsDataForSheet = leads.map(lead => ({
-      'Lead Score': lead.leadScore,
       'Company Name': lead.companyName,
-      'Latest News about the Company': 
-        (lead.latestNews && lead.latestNews.url && lead.latestNews.url !== 'N/A')
-        ? { t: 's', v: lead.latestNews.title, l: { Target: lead.latestNews.url, Tooltip: `Click to open article: ${lead.latestNews.title}` } }
-        : 'N/A',
-      'Latest News Related to India Market':
-        (lead.latestIndiaNews && lead.latestIndiaNews.url && lead.latestIndiaNews.url !== 'N/A')
-        ? { t: 's', v: lead.latestIndiaNews.title, l: { Target: lead.latestIndiaNews.url, Tooltip: `Click to open article: ${lead.latestIndiaNews.title}` } }
-        : 'N/A'
+      'Latest News': (lead.latestNews && isLinkable(lead.latestNews.url)) ? { t: 's', v: lead.latestNews.title, l: { Target: lead.latestNews.url, Tooltip: `Click to open article` } } : 'N/A',
+      'India-Related News': (lead.latestIndiaNews && isLinkable(lead.latestIndiaNews.url)) ? { t: 's', v: lead.latestIndiaNews.title, l: { Target: lead.latestIndiaNews.url, Tooltip: `Click to open article` } } : 'N/A'
     }));
     const newsWorksheet = XLSX.utils.json_to_sheet(newsDataForSheet);
-    newsWorksheet['!cols'] = [ { wch: 10 }, { wch: 30 }, { wch: 60 }, { wch: 60 } ];
+    newsWorksheet['!cols'] = [ { wch: 30 }, { wch: 60 }, { wch: 60 } ];
+    XLSX.utils.book_append_sheet(workbook, newsWorksheet, 'Latest News');
 
-    // --- Sheet 3: Instagram Posts ---
+    // --- Sheet 5: Instagram Posts ---
     const instaDataForSheet = leads.flatMap(lead => 
         (lead.latestInstagramPosts && lead.latestInstagramPosts.length > 0) 
         ? lead.latestInstagramPosts.map(post => ({
-            'Company Name': lead.companyName,
-            'Post Caption': post.caption,
-            'Post URL': { t: 's', v: post.url, l: { Target: post.url, Tooltip: `Click to open post` } }
+            'Company Name': lead.companyName, 'Post Caption': post.caption, 'Post URL': { t: 's', v: post.url, l: { Target: post.url, Tooltip: `Click to open post` } }
         })) 
-        : [{
-            'Company Name': lead.companyName,
-            'Post Caption': 'N/A',
-            // FIX: The 'Post URL' property must have a consistent type. It was a string here
-            // but an object for actual posts, causing a type error with the XLSX library.
-            // Changed to a cell object for consistency.
-            'Post URL': { t: 's', v: 'N/A' }
-        }]
+        : [{ 'Company Name': lead.companyName, 'Post Caption': 'N/A', 'Post URL': { t: 's', v: 'N/A' } }]
     );
     const instaWorksheet = XLSX.utils.json_to_sheet(instaDataForSheet);
     instaWorksheet['!cols'] = [ { wch: 30 }, { wch: 60 }, { wch: 60 } ];
-
-    // --- Create and Download Workbook ---
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, leadsWorksheet, 'Leads');
-    XLSX.utils.book_append_sheet(workbook, newsWorksheet, 'Latest News');
     XLSX.utils.book_append_sheet(workbook, instaWorksheet, 'Instagram Posts');
-    XLSX.writeFile(workbook, 'leads.xlsx');
+
+    XLSX.writeFile(workbook, 'leads_intelligence_report.xlsx');
   };
   
   const openInGoogleSheets = () => {
@@ -345,6 +452,8 @@ const LeadResultsTable: React.FC<LeadResultsTableProps> = ({ leads, region, onFi
                     lead={lead}
                     onFindLookalike={() => onFindLookalikes(lead, index)}
                     isLookalikeLoading={isLookalikeLoading === index}
+                    onAnalyzeCompetitor={onAnalyzeCompetitor}
+                    onExplainScore={onExplainScore}
                 />
             ))}
           </tbody>

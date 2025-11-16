@@ -1,9 +1,11 @@
 
 import React, { useState, useCallback, useEffect } from 'react';
-import { generateLeads, findLookalikeLeads } from './services/geminiService';
-import type { Lead, StoredSession } from './types';
+import { generateLeads, findLookalikeLeads, analyzeCompetitor, explainLeadScore } from './services/geminiService';
+import type { Lead, StoredSession, CompetitorAnalysis, ScoreExplanation } from './types';
 import LeadResultsTable from './components/LeadResultsTable';
 import Documentation from './components/Documentation';
+import CompetitorAnalysisModal from './components/CompetitorAnalysisModal';
+import ScoreExplanationModal from './components/ScoreExplanationModal';
 import { SparklesIcon, BookOpenIcon } from './components/Icons';
 
 const SearchPlatformOptions = [
@@ -15,14 +17,16 @@ const SearchPlatformOptions = [
 const RegionOptions = ['Global', 'APAC', 'UK/Europe', 'USA', 'Canada', 'MENA', 'Africa'];
 const DepartmentOptions = ['Marketing', 'International Marketing', 'Sales', 'CEO', 'Business Head', 'COO'];
 const CategoryOptions = ['Food', 'Retail', 'Technology', 'Travel & Tourism', 'Gaming & Betting'];
+const OutreachToneOptions = ['Default (Professional)', 'Formal', 'Casual & Friendly', 'Direct & Concise'];
 
 const SESSION_STORAGE_KEY = 'leadGenSession';
 
 const loadingMessages = [
   "Scanning web for expansion signals...",
-  "Analyzing company data...",
+  "Analyzing company data and SWOT...",
   "Cross-referencing LinkedIn profiles...",
   "Identifying key decision-makers...",
+  "Generating multi-step outreach cadence...",
   "Compiling deep-dive analysis...",
   "Scoring lead potential...",
   "Finalizing results..."
@@ -35,7 +39,8 @@ const App: React.FC = () => {
   const [region, setRegion] = useState(RegionOptions[0]);
   const [searchPlatforms, setSearchPlatforms] = useState<string[]>(['generalWeb', 'linkedIn']);
   const [includeSimilarCompanies, setIncludeSimilarCompanies] = useState(false);
-  const [composeEmail, setComposeEmail] = useState(false);
+  const [generateOutreachCadence, setGenerateOutreachCadence] = useState(false);
+  const [outreachTone, setOutreachTone] = useState(OutreachToneOptions[0]);
   const [exclusionList, setExclusionList] = useState('');
   const [leads, setLeads] = useState<Lead[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -43,6 +48,20 @@ const App: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [loadingMessage, setLoadingMessage] = useState(loadingMessages[0]);
   const [showDocs, setShowDocs] = useState(false);
+
+  // State for Competitor Analysis Modal
+  const [isCompetitorModalOpen, setIsCompetitorModalOpen] = useState(false);
+  const [competitorToAnalyze, setCompetitorToAnalyze] = useState<{ name: string; context: Lead } | null>(null);
+  const [competitorAnalysis, setCompetitorAnalysis] = useState<CompetitorAnalysis | null>(null);
+  const [isCompetitorLoading, setIsCompetitorLoading] = useState(false);
+  const [competitorError, setCompetitorError] = useState<string | null>(null);
+
+  // State for Score Explanation Modal
+  const [isScoreModalOpen, setIsScoreModalOpen] = useState(false);
+  const [leadToExplain, setLeadToExplain] = useState<Lead | null>(null);
+  const [scoreExplanation, setScoreExplanation] = useState<ScoreExplanation | null>(null);
+  const [isScoreExplanationLoading, setIsScoreExplanationLoading] = useState(false);
+  const [scoreExplanationError, setScoreExplanationError] = useState<string | null>(null);
 
   useEffect(() => {
     try {
@@ -56,7 +75,8 @@ const App: React.FC = () => {
             setRegion(query.region);
             setSearchPlatforms(query.searchPlatforms);
             setIncludeSimilarCompanies(query.includeSimilarCompanies || false);
-            setComposeEmail(query.composeEmail || false);
+            setGenerateOutreachCadence(query.generateOutreachCadence || false);
+            setOutreachTone(query.outreachTone || OutreachToneOptions[0]);
             setExclusionList(query.exclusionList || '');
         }
     } catch (e) {
@@ -84,7 +104,7 @@ const App: React.FC = () => {
   const saveSession = (currentLeads: Lead[]) => {
       const session: StoredSession = {
           leads: currentLeads,
-          query: { clientName, category, department, region, searchPlatforms, includeSimilarCompanies, composeEmail, exclusionList }
+          query: { clientName, category, department, region, searchPlatforms, includeSimilarCompanies, generateOutreachCadence, exclusionList, outreachTone }
       };
       localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
   }
@@ -97,7 +117,8 @@ const App: React.FC = () => {
       setRegion(RegionOptions[0]);
       setSearchPlatforms(['generalWeb', 'linkedIn']);
       setIncludeSimilarCompanies(false);
-      setComposeEmail(false);
+      setGenerateOutreachCadence(false);
+      setOutreachTone(OutreachToneOptions[0]);
       setExclusionList('');
       setError(null);
       localStorage.removeItem(SESSION_STORAGE_KEY);
@@ -115,7 +136,7 @@ const App: React.FC = () => {
     }
 
     try {
-      const generated = await generateLeads(category, department, searchPlatforms, clientName, region, includeSimilarCompanies, composeEmail, exclusionList);
+      const generated = await generateLeads(category, department, searchPlatforms, clientName, region, includeSimilarCompanies, generateOutreachCadence, exclusionList, outreachTone);
       setLeads(generated);
       saveSession(generated);
     } catch (err) {
@@ -123,7 +144,7 @@ const App: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [category, department, searchPlatforms, clientName, region, includeSimilarCompanies, composeEmail, exclusionList]);
+  }, [category, department, searchPlatforms, clientName, region, includeSimilarCompanies, generateOutreachCadence, exclusionList, outreachTone]);
 
   const handleFindLookalikes = useCallback(async (seedLead: Lead, index: number) => {
     setIsLookalikeLoading(index);
@@ -140,9 +161,73 @@ const App: React.FC = () => {
     }
   }, [leads, region, department, exclusionList]);
 
+  const handleAnalyzeCompetitor = useCallback(async (competitorName: string, leadContext: Lead) => {
+    setCompetitorToAnalyze({ name: competitorName, context: leadContext });
+    setIsCompetitorModalOpen(true);
+    setIsCompetitorLoading(true);
+    setCompetitorError(null);
+    setCompetitorAnalysis(null);
+    try {
+      const analysis = await analyzeCompetitor(competitorName, leadContext, region);
+      setCompetitorAnalysis(analysis);
+    } catch (err) {
+      setCompetitorError(err instanceof Error ? err.message : 'An unknown error occurred.');
+    } finally {
+      setIsCompetitorLoading(false);
+    }
+  }, [region]);
+
+  const closeCompetitorModal = () => {
+    setIsCompetitorModalOpen(false);
+    setCompetitorToAnalyze(null);
+    setCompetitorAnalysis(null);
+    setCompetitorError(null);
+  };
+
+  const handleExplainScore = useCallback(async (lead: Lead) => {
+    setLeadToExplain(lead);
+    setIsScoreModalOpen(true);
+    setIsScoreExplanationLoading(true);
+    setScoreExplanationError(null);
+    setScoreExplanation(null);
+    try {
+        const explanation = await explainLeadScore(lead);
+        setScoreExplanation(explanation);
+    } catch (err) {
+        setScoreExplanationError(err instanceof Error ? err.message : 'An unknown error occurred.');
+    } finally {
+        setIsScoreExplanationLoading(false);
+    }
+  }, []);
+
+  const closeScoreModal = () => {
+    setIsScoreModalOpen(false);
+    setLeadToExplain(null);
+    setScoreExplanation(null);
+    setScoreExplanationError(null);
+  };
+
   return (
     <div className="min-h-screen bg-slate-900 text-slate-200 flex flex-col items-center p-4 sm:p-6 lg:p-8">
       {showDocs && <Documentation onClose={() => setShowDocs(false)} />}
+      {isCompetitorModalOpen && (
+        <CompetitorAnalysisModal
+          competitorName={competitorToAnalyze?.name || ''}
+          isLoading={isCompetitorLoading}
+          analysis={competitorAnalysis}
+          error={competitorError}
+          onClose={closeCompetitorModal}
+        />
+      )}
+       {isScoreModalOpen && (
+        <ScoreExplanationModal
+          lead={leadToExplain}
+          isLoading={isScoreExplanationLoading}
+          explanation={scoreExplanation}
+          error={scoreExplanationError}
+          onClose={closeScoreModal}
+        />
+      )}
       <div className="w-full max-w-7xl mx-auto">
         <header className="text-center mb-10 relative">
           <h1 className="text-4xl sm:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-cyan-400 mb-2">
@@ -237,7 +322,7 @@ const App: React.FC = () => {
               <label className="block text-sm font-semibold mb-3 text-slate-300">
                 Search Platforms & Options
               </label>
-              <div className="flex flex-wrap gap-x-4 gap-y-2">
+              <div className="flex flex-wrap gap-x-4 gap-y-2 items-start">
                 {SearchPlatformOptions.map(platform => (
                   <div key={platform.id} className="flex items-center">
                     <input
@@ -252,18 +337,35 @@ const App: React.FC = () => {
                     </label>
                   </div>
                 ))}
-                <div className="flex items-center">
-                    <input
-                      id="composeEmail"
-                      type="checkbox"
-                      checked={composeEmail}
-                      onChange={(e) => setComposeEmail(e.target.checked)}
-                      className="w-4 h-4 text-purple-600 bg-slate-700 border-slate-500 rounded focus:ring-purple-500 focus:ring-2"
-                    />
-                    <label htmlFor="composeEmail" className="ml-2 text-sm font-medium text-slate-300">
-                      Generate AI Outreach Email
-                    </label>
+                <div>
+                  <div className="flex items-center">
+                      <input
+                        id="generateOutreachCadence"
+                        type="checkbox"
+                        checked={generateOutreachCadence}
+                        onChange={(e) => setGenerateOutreachCadence(e.target.checked)}
+                        className="w-4 h-4 text-purple-600 bg-slate-700 border-slate-500 rounded focus:ring-purple-500 focus:ring-2"
+                      />
+                      <label htmlFor="generateOutreachCadence" className="ml-2 text-sm font-medium text-slate-300">
+                        Generate Outreach Cadence
+                      </label>
                   </div>
+                  {generateOutreachCadence && (
+                      <div className="mt-2 pl-6">
+                          <label htmlFor="outreachTone" className="block text-xs font-semibold mb-1 text-slate-400">
+                              Cadence Tone
+                          </label>
+                          <select
+                              id="outreachTone"
+                              value={outreachTone}
+                              onChange={(e) => setOutreachTone(e.target.value)}
+                              className="w-full bg-slate-700 border border-slate-600 rounded-md p-1.5 text-xs focus:ring-1 focus:ring-purple-500 focus:border-purple-500 transition-all duration-300"
+                          >
+                              {OutreachToneOptions.map(t => <option key={t} value={t}>{t}</option>)}
+                          </select>
+                      </div>
+                  )}
+                </div>
               </div>
             </div>
             <div>
@@ -317,7 +419,14 @@ const App: React.FC = () => {
         )}
 
         {leads.length > 0 && (
-          <LeadResultsTable leads={leads} region={region} onFindLookalikes={handleFindLookalikes} isLookalikeLoading={isLookalikeLoading} />
+          <LeadResultsTable 
+            leads={leads} 
+            region={region} 
+            onFindLookalikes={handleFindLookalikes} 
+            isLookalikeLoading={isLookalikeLoading}
+            onAnalyzeCompetitor={handleAnalyzeCompetitor}
+            onExplainScore={handleExplainScore}
+          />
         )}
 
         {!isLoading && leads.length === 0 && !error && (

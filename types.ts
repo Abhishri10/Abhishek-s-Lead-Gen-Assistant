@@ -15,11 +15,31 @@ export interface InstagramPost {
   url: string;
 }
 
+export interface SWOT {
+    strengths: string[];
+    weaknesses: string[];
+    opportunities: string[];
+    threats: string[];
+}
+
+export interface OutreachStep {
+    step: number;
+    subject: string;
+    body: string;
+}
+
+export interface CompetitorAnalysis {
+    analysis: string;
+    marketShare: string;
+    recentNews: NewsArticle;
+}
+
 export interface Lead {
   companyName: string;
   category: string;
   companyLinkedIn: string;
   justification: string;
+  marketEntrySignals: string[];
   email: string;
   phone: string;
   contacts: Contact[];
@@ -29,9 +49,10 @@ export interface Lead {
   latestFunding: string;
   techStack: string[];
   competitors: string[];
+  swotAnalysis: SWOT;
   latestNews?: NewsArticle;
   latestIndiaNews?: NewsArticle;
-  composedEmail?: string;
+  outreachCadence?: OutreachStep[];
   latestInstagramPosts?: InstagramPost[];
 }
 
@@ -42,11 +63,17 @@ export interface SearchQuery {
     region: string;
     searchPlatforms: string[];
     includeSimilarCompanies: boolean;
-    composeEmail: boolean;
+    generateOutreachCadence: boolean;
     exclusionList: string;
+    outreachTone: string;
 }
 
 export interface StoredSession {
     leads: Lead[];
     query: SearchQuery;
+}
+
+export interface ScoreExplanation {
+    explanation: string;
+    bulletPoints: string[];
 }
