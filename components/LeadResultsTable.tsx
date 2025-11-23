@@ -12,6 +12,8 @@ interface LeadResultsTableProps {
   isLookalikeLoading: number | null;
   onAnalyzeCompetitor: (competitorName: string, leadContext: Lead) => void;
   onExplainScore: (lead: Lead) => void;
+  onGenerateOutreach: () => void;
+  isOutreachLoading: boolean;
 }
 
 const isLinkable = (url?: string): url is string => !!url && url !== 'Not found' && url.startsWith('http');
@@ -272,7 +274,7 @@ const LeadCompanyGroup: React.FC<{
 };
 
 
-const LeadResultsTable: React.FC<LeadResultsTableProps> = ({ leads, region, onFindLookalikes, isLookalikeLoading, onAnalyzeCompetitor, onExplainScore }) => {
+const LeadResultsTable: React.FC<LeadResultsTableProps> = ({ leads, region, onFindLookalikes, isLookalikeLoading, onAnalyzeCompetitor, onExplainScore, onGenerateOutreach, isOutreachLoading }) => {
   const [copiedNotification, setCopiedNotification] = useState('');
 
   const getFlattenedLeads = () => leads.flatMap(lead =>
@@ -284,6 +286,9 @@ const LeadResultsTable: React.FC<LeadResultsTableProps> = ({ leads, region, onFi
     }))
   );
   
+  // Check if we should show the prominent "Generate Outreach" CTA
+  const showGenerateOutreachButton = leads.length > 0 && leads.some(lead => !lead.outreachCadence || lead.outreachCadence.length === 0);
+
   const generateCSV = (): string => {
     const flattenedLeads = getFlattenedLeads();
     const headers = [
@@ -463,6 +468,21 @@ const LeadResultsTable: React.FC<LeadResultsTableProps> = ({ leads, region, onFi
       <div className="flex flex-col sm:flex-row justify-between items-center mb-4 gap-4">
         <h2 className="text-2xl font-bold text-slate-100">Generated Leads</h2>
         <div className="flex items-center gap-2 flex-wrap justify-center">
+          {showGenerateOutreachButton && (
+              <button 
+                  onClick={onGenerateOutreach} 
+                  disabled={isOutreachLoading}
+                  className="flex items-center gap-2 px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold rounded-lg shadow-md transition-colors duration-300 disabled:opacity-50 disabled:cursor-wait mr-2"
+                  title="Generate email sequences for these leads"
+              >
+                  {isOutreachLoading ? (
+                      <div className="w-5 h-5 border-2 border-t-transparent border-white rounded-full animate-spin"></div>
+                  ) : (
+                      <SparklesIcon className="w-5 h-5" />
+                  )}
+                  <span>Generate Outreach Emails</span>
+              </button>
+          )}
            <button onClick={downloadCSV} className="flex items-center gap-2 px-3 py-2 bg-sky-600 hover:bg-sky-700 text-white font-semibold rounded-lg shadow-md transition-colors duration-300 disabled:opacity-50 disabled:cursor-not-allowed" disabled={leads.length === 0} title="Download .CSV">
             <DownloadIcon className="w-5 h-5" /> <span>.csv</span>
           </button>

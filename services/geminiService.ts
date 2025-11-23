@@ -1,6 +1,6 @@
 
 import { GoogleGenAI } from "@google/genai";
-import type { Lead, CompetitorAnalysis, ScoreExplanation } from '../types';
+import type { Lead, CompetitorAnalysis, ScoreExplanation, OutreachStep } from '../types';
 
 if (!process.env.API_KEY) {
   throw new Error("API_KEY environment variable is not set");
@@ -8,46 +8,92 @@ if (!process.env.API_KEY) {
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
+// Helper function to robustly extract JSON from mixed text
+const extractJson = (text: string, isArray: boolean): string => {
+    // 1. Try to extract from markdown code block first
+    const markdownMatch = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+    if (markdownMatch) {
+        const content = markdownMatch[1].trim();
+        const start = isArray ? '[' : '{';
+        // Basic check if it looks like the expected format
+        if (content.startsWith(start)) {
+            return content;
+        }
+    }
+
+    // 2. Fallback to finding the bracket structure in the raw text
+    const startChar = isArray ? '[' : '{';
+    const endChar = isArray ? ']' : '}';
+    const startIndex = text.indexOf(startChar);
+    
+    if (startIndex === -1) return text; 
+    
+    let balance = 0;
+    let inString = false;
+    let escape = false;
+    
+    for (let i = startIndex; i < text.length; i++) {
+        const char = text[i];
+        if (escape) { escape = false; continue; }
+        if (char === '\\') { escape = true; continue; }
+        if (char === '"') { inString = !inString; continue; }
+        
+        if (!inString) {
+            if (char === startChar) balance++;
+            else if (char === endChar) {
+                balance--;
+                if (balance === 0) return text.substring(startIndex, i + 1);
+            }
+        }
+    }
+    
+    // Fallback: if no balanced end found, try finding the last occurrence
+    const lastIndex = text.lastIndexOf(endChar);
+    if (lastIndex > startIndex) return text.substring(startIndex, lastIndex + 1);
+    
+    return text.substring(startIndex);
+};
+
 const systemInstruction = `
-You are a world-class lead generation expert and sales strategist. Your purpose is to identify international companies showing strong potential for expanding into the Indian market. For each company, you must perform deep analysis to score the lead's quality and provide a personalized outreach suggestion. You must follow all instructions precisely and return data ONLY in the specified JSON array format.
+You are a relentless and world-class Lead Generation Researcher & Data Scraper. 
+Your goal is to find high-value international companies expanding into the Indian market. 
+You do not stop at surface-level results; you dig deep into social media signals, job boards, and press releases to find accurate, actionable intelligence.
+Your output must be exhaustive, verified, and formatted strictly as a JSON array.
 `;
 
-const dataGatheringRules = `
-**Data Gathering Rules:**
+const getBaseDataGatheringRules = (departments: string[]) => `
+**Data Gathering & Verification Protocol:**
 
-**For each identified company:**
+**For each identified company, you must perform a "Deep Search" to ensure accuracy:**
+
 1.  **Company Info & Deep-Dive Analysis:**
     - companyName: Official name.
     - companyLinkedIn: Full LinkedIn URL.
     - category: Company's industry.
-    - email: Find a public contact email from the company's official site. Use "N/A" if none.
-    - phone: Find a public phone number from the company's official site. Use "N/A" if none.
-    - justification: A brief, high-level summary (2-3 sentences) of why this company is a strong lead for Indian market expansion.
-    - marketEntrySignals: An array of 3-5 specific, verifiable bullet points that support the justification (e.g., "Recent $50M funding for global expansion", "Job posting for Head of Sales, India", "CEO mentioned APAC focus in a recent podcast").
-    - leadScore: A numerical score from 1-100 indicating the strength of the lead, where 100 is the strongest. Base this on the recency and relevance of their expansion signals (e.g., recent funding, job postings, official announcements).
-    - outreachSuggestion: A single, compelling sentence to use as a personalized icebreaker in an outreach email, directly referencing the 'justification' and 'marketEntrySignals'.
-    - employeeCount: Estimated number of employees (e.g., "51-200").
-    - latestFunding: Details of the most recent funding round (e.g., "$50M Series B - Oct 2023"). Use "N/A" if not found.
-    - techStack: An array of key technologies the company uses (e.g., ["Salesforce", "AWS", "Shopify"]).
-    - competitors: An array of 2-3 main competitors.
-    - swotAnalysis: An object with four arrays of strings: 'strengths', 'weaknesses', 'opportunities', and 'threats'. Each array should contain 2-3 brief bullet points analyzing the company's potential for Indian market entry.
-    - painPointAnalysis: An array of 2-3 potential business pain points. For each, identify a specific 'painPoint' the company likely faces (based on SWOT analysis, industry trends, or recent news) and a 'suggestedSolution' which is a one-sentence pitch on how your service could solve it.
-    - latestNews: An object containing the 'title' and 'url' of the most recent, relevant general news article about the company (e.g. funding, product launch). The URL must be a direct link. If none, return an object with "N/A" for both title and url.
-    - latestIndiaNews: An object containing the 'title' and 'url' of the most recent news, press release, or significant public statement specifically mentioning the company's interest, plans, or activities related to the Indian market. The URL must be a direct link. If no such specific news is found, return an object with "N/A" for both title and url.
-    - instagramProfileUrl: The full URL to the company's official Instagram profile. Use "N/A" if not found.
-    - latestInstagramPosts: An array of up to 5 of the company's most recent Instagram posts. Each object in the array should contain 'caption' and 'url'. The 'url' MUST be a direct, publicly accessible link to the specific post (e.g., https://www.instagram.com/p/Cxyz...). If you can find the post's caption but not its specific URL, use the main instagramProfileUrl as the post's URL. If no profile is found, return an empty array [].
+    - email: **SCRAPE HARD:** Look for "press@", "contact@", "hello@" or investor relations emails on their official site or press releases. Use "N/A" only if absolutely nothing is found after multiple attempts.
+    - phone: Official HQ or regional office phone number.
+    - justification: A specific, non-generic summary (2-3 sentences) of *why* they are a lead for India. Mention specific campaigns, hiring, or investments.
+    - marketEntrySignals: An array of 3-5 **verified** bullet points (e.g., "Hiring 'Country Manager India' on LinkedIn", "Registered Indian subsidiary entity", "Launched '.in' website domain").
+    - leadScore: A numerical score (1-100). High scores (80+) require *active* investment/hiring. Medium scores (60-79) imply *intent* or partnerships.
+    - outreachSuggestion: A personalized icebreaker referencing a specific recent event found in your research.
+    - employeeCount: Estimated global count.
+    - latestFunding: Most recent funding round with date.
+    - techStack: An array of confirmed technologies they use (check job descriptions for "skills required" to infer this).
+    - competitors: 2-3 major competitors.
+    - swotAnalysis: Detailed SWOT relative to the *Indian* market.
+    - painPointAnalysis: 2-3 specific business challenges they likely face in India (e.g., regulatory hurdles, local competition).
+    - latestNews: { title, url } of a general recent news article.
+    - latestIndiaNews: { title, url } of a news article *specifically* linking them to India. **CRITICAL:** If they are entering India, this must exist.
+    - instagramProfileUrl: Official Instagram handle.
+    - latestInstagramPosts: Array of { caption, url } for up to 5 recent posts. **Simulate Scraping:** Look for posts with hashtags like #India, #NewLaunch, #Expansion.
 
-2.  **Contacts (Find up to 5 people in the specified department):**
-    For each potential contact, you MUST perform this verification:
-    1. Find their LinkedIn profile using a targeted search.
-    2. **Verify (ALL MUST BE TRUE):**
-        a. **Company:** Current company on LinkedIn EXACTLY matches the researched company.
-        b. **Strict Region Match:** The contact's location listed on their LinkedIn profile MUST be within the specified search region. For instance, if the target region is 'UK/Europe', the contact's location must be in a country within the UK or Europe. This is a non-negotiable rule. If a contact's location is outside the target region, you MUST DISCARD them and find another contact who is located within the region.
-        c. **Role:** Job title matches the target department.
-    3. **Result:**
-        - **MANDATORY:** If a contact is VERIFIED, you MUST provide their full, valid LinkedIn profile URL for the 'contactLinkedIn' field. It cannot be empty.
-        - If you cannot find or verify a contact's LinkedIn profile after a thorough search, use the exact string "Not found" for the 'contactLinkedIn' value. Do not invent a URL.
-        - If a contact fails the verification check at any step, DISCARD them immediately and find a different person who meets all criteria.
+2.  **Contacts (Find 3-5 key decision-makers across the following departments: ${departments.join(', ')}):**
+    - Target the specific departments requested (${departments.join(', ')}).
+    - **Verification:**
+        - You MUST verify the person is currently at the company.
+        - You MUST verify the person covers the target region (or Global/APAC roles).
+        - **LinkedIn Scraping Simulation:** Use search queries like \`site:linkedin.com/in/ "Company Name" "Job Title"\` to find real profiles.
+        - If a specific individual cannot be verified, find a generic department head or regional lead.
 `;
 
 const jsonFormatInstructions = `
@@ -56,16 +102,10 @@ Your entire response MUST be a single, valid JSON array of lead objects. Do NOT 
 `;
 
 const parseAIResponse = (responseText: string): Lead[] => {
-    let jsonText = responseText.trim();
-    if (!jsonText) throw new Error("Received an empty response from the AI.");
+    if (!responseText) throw new Error("Received an empty response from the AI.");
     
-    const startIndex = jsonText.indexOf('[');
-    const endIndex = jsonText.lastIndexOf(']');
+    const jsonText = extractJson(responseText, true);
 
-    if (startIndex !== -1 && endIndex !== -1 && endIndex > startIndex) {
-      jsonText = jsonText.substring(startIndex, endIndex + 1);
-    }
-    
     try {
         const parsed = JSON.parse(jsonText);
         // Basic validation to ensure the AI didn't return a single object instead of an array
@@ -74,7 +114,7 @@ const parseAIResponse = (responseText: string): Lead[] => {
         }
         return parsed;
     } catch (error) {
-        console.error("Raw AI Response that failed to parse:", jsonText);
+        console.error("Raw AI Response that failed to parse:", responseText);
         throw new Error("Failed to parse the AI's response. The model did not return valid JSON. Please try refining your search.");
     }
 }
@@ -82,7 +122,7 @@ const parseAIResponse = (responseText: string): Lead[] => {
 
 export const generateLeads = async (
     category: string, 
-    department: string, 
+    departments: string[], 
     platforms: string[],
     clientName: string,
     region: string,
@@ -91,21 +131,37 @@ export const generateLeads = async (
     exclusionList: string,
     outreachTone: string
 ): Promise<Lead[]> => {
-  if ((!category.trim() && !clientName.trim()) || !department || platforms.length === 0) {
+  if ((!category.trim() && !clientName.trim()) || departments.length === 0 || platforms.length === 0) {
     return [];
   }
   
-  let platformInstructions = '';
+  // Enhanced Search Instructions simulating "Scraping"
+  let platformInstructions = '**Advanced Search Strategy (Execute these queries via Google Search Tool):**\n';
+  
   if (platforms.includes('generalWeb')) {
-    platformInstructions += `- In-depth Web Search: Look for news, press releases, or reports about international expansion, funding for emerging markets, or partnerships in the Asia-Pacific region.\n`;
+    platformInstructions += `- **News Scraping:** Search \`"${category}" "India expansion" "investing in India" "new office" site:news.google.com\` and industry-specific news portals.\n`;
+    platformInstructions += `- **Corporate Signals:** Search \`"Company Name" "Investor Presentation" "India strategy" filetype:pdf\`.\n`;
+    
+    if (category === 'Airlines') {
+        platformInstructions += `- **Aviation Source Scraping:** Search \`"launching flights to India" site:simpleflying.com OR site:aviationweek.com OR site:livemint.com\`.\n`;
+        platformInstructions += `- **GSA Search:** Search \`"appointed General Sales Agent India" "${category}"\`.\n`;
+    }
+    if (category === 'Travel & Tourism') {
+         platformInstructions += `- **Tourism Source Scraping:** Search \`"tourism board" "roadshow India" site:traveltrendstoday.in OR site:travelbizmonitor.com\`.\n`;
+    }
   }
   if (platforms.includes('linkedIn')) {
-    platformInstructions += `- LinkedIn: Scan for companies posting jobs in India or showing increased engagement from Indian professionals.\n`;
+    platformInstructions += `- **LinkedIn X-Ray:** Search \`site:linkedin.com/jobs "hiring" "${category}" "India"\` to find companies actively recruiting.\n`;
+    platformInstructions += `- **Profile Scraping:** Search \`site:linkedin.com/in/ "${category}" "Head of India" OR "VP Asia" "Company Name"\` to find contacts.\n`;
   }
   if (platforms.includes('socialMedia')) {
-    platformInstructions += `- Social Media (Facebook, X, Instagram, Reddit, etc.): Analyze mentions, discussions, and official posts from Indian users or related to Indian market interest to gauge organic engagement and expansion signals.\n`;
+    platformInstructions += `- **Social Signal Scraping:** Search \`site:instagram.com "${category}" "India" "coming soon"\` and \`site:facebook.com "${category}" "launching in India"\`.\n`;
+    platformInstructions += `- **Twitter/X:** Search \`site:twitter.com "${category}" "entering India"\`.\n`;
+    platformInstructions += `- **Reddit Intel:** Search \`site:reddit.com "${category}" "India" "coming to India" OR "launching" OR "rumors"\` to catch early discussions and insider news about market entry.\n`;
   }
   
+  const deptString = departments.join(', ');
+
   let taskDescription = '';
     if (clientName.trim()) {
         let clientContext = `the company "${clientName}"`;
@@ -113,19 +169,37 @@ export const generateLeads = async (
         clientContext += `, which is based in the "${region}" region.`;
 
         if (includeSimilar) {
-            taskDescription = `Your primary task is a deep-dive investigation into ${clientContext}. In addition to this, identify up to 5 other international companies that are similar to "${clientName}" in business model and category, also from the "${region}" region and showing strong potential for Indian market expansion. For all companies found (the primary one and the similar ones), find contacts in the "${department}" department.`;
+            taskDescription = `Your primary task is a deep-dive investigation into ${clientContext}. In addition to this, identify **5 to 8** other international companies that are similar to "${clientName}" in business model and category, also from the "${region}" region and showing strong potential for Indian market expansion. For all companies found, find contacts in the following departments: "${deptString}".`;
         } else {
-            taskDescription = `Your task is to perform a deep-dive investigation into ${clientContext} to assess their potential for expanding into the Indian market. Find contacts in the "${department}" department.`;
+            taskDescription = `Your task is to perform a deep-dive investigation into ${clientContext} to assess their potential for expanding into the Indian market. Find contacts in the following departments: "${deptString}".`;
         }
     } else {
-        taskDescription = `Your task is to identify up to 10 international companies from the "${region}" region in the "${category}" category that are strong candidates for expanding into the Indian market. For each company, find contacts in the "${department}" department.`;
+        // Updated lead count to 10-12 to fit within output token limits while maintaining quality
+        taskDescription = `Your task is to identify **10 to 12** high-potential international companies from the "${region}" region in the "${category}" category that are strong candidates for expanding into the Indian market. \n\n**CRITICAL QUALITY REQUIREMENT:** Prioritize the quality and depth of data over quantity. Find contacts in the following departments: "${deptString}".`;
+    }
+    
+    if (category === 'Travel & Tourism') {
+        taskDescription += `\n\n**IMPORTANT FOR TRAVEL & TOURISM:** 
+        1. **Tourism Boards:** You MUST actively search for major **International Tourism Boards** or Destination Marketing Organizations (DMOs) from the "${region}" region (e.g., "Visit Britain", "Tourism Australia", "Swiss Travel System", "Visit Dubai"). Check for recent "Roadshows in India", "Sales Missions", or "SATTE participation".
+        2. **Hotel Chains:** Look for international hotel chains announcing new properties in India.
+        3. **Experience Providers:** Look for global tour operators (like Contiki, G Adventures) increasing their India inventory.
+        `;
+    }
+
+    if (category === 'Airlines') {
+        taskDescription += `\n\n**IMPORTANT FOR AIRLINES:**
+        1. **New Routes:** Prioritize airlines announcing *direct* flights.
+        2. **Code Shares & Interline:** If no direct flights, look for *expanded codeshare agreements* with Indian carriers (IndiGo, Air India, SpiceJet) which act as a market entry signal.
+        3. **GSA Appointments:** Search aggressively for "appointed General Sales Agent (GSA) in India". This is a massive lead signal for airlines without physical offices.
+        4. **Capacity:** Look for news about "increasing frequency" or "upgrading aircraft" to India routes.
+        `;
     }
 
     if (exclusionList.trim()) {
       taskDescription += `\n\n**IMPORTANT EXCLUSION RULE:** You MUST NOT include any of the following companies in your results, even if they are a perfect match: ${exclusionList.trim()}.`;
     }
     
-  let currentDataGatheringRules = dataGatheringRules;
+  let currentDataGatheringRules = getBaseDataGatheringRules(departments);
   let jsonExampleFields = `
   "companyName": "Example Corp",
   "category": "Technology",
@@ -186,7 +260,6 @@ export const generateLeads = async (
   const finalPrompt = `
 ${taskDescription}
 
-**Search Methods:**
 ${platformInstructions}
 
 ${currentDataGatheringRules}
@@ -205,12 +278,14 @@ ${jsonFormatInstructions}
   
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-pro",
+      model: "gemini-2.5-flash", // Use 2.5 Flash for speed and thinking capabilities
       contents: finalPrompt,
       config: {
         systemInstruction: systemInstruction,
         tools: [{googleSearch: {}}],
-        temperature: 0.1, 
+        // Reduced thinking budget to avoid 500 internal errors (token overflow)
+        // Default maxOutputTokens is ~8k. Budget must be significantly lower to leave room for the leads.
+        thinkingConfig: { thinkingBudget: 2048 }, 
       },
     });
 
@@ -231,11 +306,13 @@ ${jsonFormatInstructions}
 export const findLookalikeLeads = async (
     seedLead: Lead,
     region: string,
-    department: string,
+    departments: string[],
     exclusionList: string
 ): Promise<Lead[]> => {
+    const deptString = departments.join(', ');
     
-    let taskDescription = `Your task is to identify up to 5 international companies that are "lookalikes" of an existing lead, "${seedLead.companyName}". These new companies should also be from the "${region}" region and be strong candidates for expanding into the Indian market. Use the seed lead's category ("${seedLead.category}") and business model as a template. For each new company, find contacts in the "${department}" department. You MUST generate all the same data points for these new leads as specified in the Data Gathering Rules.`;
+    // Reduced count to ensure stability
+    let taskDescription = `Your task is to identify **5 to 8** international companies that are "lookalikes" of an existing lead, "${seedLead.companyName}". These new companies should also be from the "${region}" region and be strong candidates for expanding into the Indian market. Use the seed lead's category ("${seedLead.category}") and business model as a template. For each new company, find contacts in the following departments: "${deptString}". You MUST generate all the same data points for these new leads as specified in the Data Gathering Rules.`;
 
     if (exclusionList.trim()) {
       taskDescription += `\n\n**IMPORTANT EXCLUSION RULE:** You MUST NOT include any of the following companies in your results, even if they are a perfect match: ${exclusionList.trim()}.`;
@@ -254,19 +331,19 @@ ${taskDescription}
 
 ${seedLeadInfo}
 
-${dataGatheringRules}
+${getBaseDataGatheringRules(departments)}
 
 ${jsonFormatInstructions}
 `;
 
     try {
         const response = await ai.models.generateContent({
-            model: "gemini-2.5-pro",
+            model: "gemini-2.5-flash",
             contents: finalPrompt,
             config: {
                 systemInstruction: systemInstruction,
                 tools: [{googleSearch: {}}],
-                temperature: 0.5, // Slightly higher temp for more creative lookalikes
+                thinkingConfig: { thinkingBudget: 2048 },
             },
         });
 
@@ -291,7 +368,6 @@ export const analyzeCompetitor = async (
 ): Promise<CompetitorAnalysis> => {
     const systemInstruction = `You are a concise and accurate market intelligence analyst. Your goal is to provide a brief but insightful competitor analysis. Return data ONLY in the specified JSON format.`;
 
-    // Fix: Pass region as an argument and use it in the prompt instead of leadContext.region
     const prompt = `
     Analyze the company "${competitorName}". This company is a competitor to "${leadContext.companyName}" in the "${leadContext.category}" industry, likely operating in or targeting the "${region}" region.
 
@@ -316,7 +392,7 @@ export const analyzeCompetitor = async (
 
     try {
         const response = await ai.models.generateContent({
-            model: "gemini-2.5-pro",
+            model: "gemini-2.5-flash", // Use standard Flash for consistency
             contents: prompt,
             config: {
                 systemInstruction: systemInstruction,
@@ -325,13 +401,8 @@ export const analyzeCompetitor = async (
             },
         });
         
-        const jsonText = response.text.trim();
-        const startIndex = jsonText.indexOf('{');
-        const endIndex = jsonText.lastIndexOf('}');
-        if (startIndex !== -1 && endIndex !== -1 && endIndex > startIndex) {
-            return JSON.parse(jsonText.substring(startIndex, endIndex + 1));
-        }
-        throw new Error("Could not find a valid JSON object in the response.");
+        const jsonText = extractJson(response.text, false);
+        return JSON.parse(jsonText);
         
     } catch (error) {
         console.error("Error analyzing competitor:", error);
@@ -384,13 +455,8 @@ export const explainLeadScore = async (lead: Lead): Promise<ScoreExplanation> =>
             },
         });
 
-        const jsonText = response.text.trim();
-        const startIndex = jsonText.indexOf('{');
-        const endIndex = jsonText.lastIndexOf('}');
-        if (startIndex !== -1 && endIndex !== -1 && endIndex > startIndex) {
-            return JSON.parse(jsonText.substring(startIndex, endIndex + 1));
-        }
-        throw new Error("Could not find a valid JSON object in the AI response.");
+        const jsonText = extractJson(response.text, false);
+        return JSON.parse(jsonText);
 
     } catch (error) {
         console.error("Error explaining lead score:", error);
@@ -398,5 +464,57 @@ export const explainLeadScore = async (lead: Lead): Promise<ScoreExplanation> =>
             throw new Error(`Failed to get score explanation from AI: ${error.message}`);
         }
         throw new Error("An unknown error occurred while explaining the lead score.");
+    }
+};
+
+export const generateOutreachForLead = async (lead: Lead, tone: string): Promise<OutreachStep[]> => {
+    const systemInstruction = `You are an expert sales copywriter. Your task is to write a personalized 2-step email outreach sequence.`;
+    
+    const contactPerson = lead.contacts && lead.contacts.length > 0 ? lead.contacts[0] : { contactName: 'Decision Maker', designation: 'Manager' };
+
+    const prompt = `
+    Context:
+    My company helps international businesses successfully launch and expand into the Indian market.
+    
+    Target Lead:
+    - Company: ${lead.companyName}
+    - Contact: ${contactPerson.contactName} (${contactPerson.designation})
+    - Expansion Signal: ${lead.justification}
+    - Key Events: ${lead.marketEntrySignals.join('; ')}
+    - Icebreaker Suggestion: ${lead.outreachSuggestion}
+    
+    Task:
+    Write a sequence of 2 emails (an initial outreach and a follow-up) addressed to ${contactPerson.contactName}.
+    Tone: ${tone}
+    
+    Structure:
+    Email 1: Use the icebreaker, reference their expansion signals to show research, propose a value add regarding their India entry, and ask for a call.
+    Email 2: A gentle, professional follow-up sent 3 days later, perhaps offering a case study or value nugget.
+
+    Output Format:
+    Return a valid JSON array of objects. Each object must have:
+    - step: number (1 or 2)
+    - subject: string
+    - body: string (Use \\n for line breaks)
+    
+    **Output Format:**
+    Your entire response MUST be a single, valid JSON array. Do NOT include any text, explanations, or markdown.
+    `;
+
+    try {
+        const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: prompt,
+            config: {
+                systemInstruction: systemInstruction,
+                temperature: 0.7,
+            },
+        });
+
+        const jsonText = extractJson(response.text, true);
+        return JSON.parse(jsonText);
+    } catch (error) {
+        console.error("Error generating outreach for lead:", error);
+        return [];
     }
 };

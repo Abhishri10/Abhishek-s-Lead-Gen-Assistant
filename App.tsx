@@ -1,6 +1,6 @@
 
 import React, { useState, useCallback, useEffect } from 'react';
-import { generateLeads, findLookalikeLeads, analyzeCompetitor, explainLeadScore } from './services/geminiService';
+import { generateLeads, findLookalikeLeads, analyzeCompetitor, explainLeadScore, generateOutreachForLead } from './services/geminiService';
 import type { Lead, StoredSession, CompetitorAnalysis, ScoreExplanation } from './types';
 import LeadResultsTable from './components/LeadResultsTable';
 import Documentation from './components/Documentation';
@@ -11,12 +11,12 @@ import { SparklesIcon, BookOpenIcon } from './components/Icons';
 const SearchPlatformOptions = [
   { id: 'generalWeb', name: 'In-depth Web Search' },
   { id: 'linkedIn', name: 'LinkedIn' },
-  { id: 'socialMedia', name: 'Social Media Search (FB, X, Instagram)' }
+  { id: 'socialMedia', name: 'Social Media Search (FB, X, Insta, Reddit)' }
 ];
 
 const RegionOptions = ['Global', 'APAC', 'UK/Europe', 'USA', 'Canada', 'MENA', 'Africa'];
 const DepartmentOptions = ['Marketing', 'International Marketing', 'Sales', 'CEO', 'Business Head', 'COO'];
-const CategoryOptions = ['Food', 'Retail', 'Technology', 'Travel & Tourism', 'Gaming & Betting', 'Education', 'Others'];
+const CategoryOptions = ['Airlines', 'Food', 'Retail', 'Technology', 'Travel & Tourism', 'Gaming & Betting', 'Education', 'Others'];
 const OutreachToneOptions = ['Default (Professional)', 'Formal', 'Casual & Friendly', 'Direct & Concise'];
 
 const SESSION_STORAGE_KEY = 'leadGenSession';
@@ -36,7 +36,7 @@ const App: React.FC = () => {
   const [clientName, setClientName] = useState('');
   const [category, setCategory] = useState('');
   const [otherCategory, setOtherCategory] = useState('');
-  const [department, setDepartment] = useState('');
+  const [departments, setDepartments] = useState<string[]>([]);
   const [region, setRegion] = useState('');
   const [searchPlatforms, setSearchPlatforms] = useState<string[]>([]);
   const [includeSimilarCompanies, setIncludeSimilarCompanies] = useState(false);
@@ -64,6 +64,9 @@ const App: React.FC = () => {
   const [isScoreExplanationLoading, setIsScoreExplanationLoading] = useState(false);
   const [scoreExplanationError, setScoreExplanationError] = useState<string | null>(null);
 
+  // State for Post-hoc Outreach Generation
+  const [isOutreachLoading, setIsOutreachLoading] = useState(false);
+
   const getFinalCategory = useCallback(() => {
     return category === 'Others' ? otherCategory.trim() : category;
   }, [category, otherCategory]);
@@ -87,7 +90,16 @@ const App: React.FC = () => {
                 setCategory('');
             }
 
-            setDepartment(query.department);
+            // Handle migration from string department to array
+            const savedDept: any = query.department;
+            if (Array.isArray(savedDept)) {
+                setDepartments(savedDept);
+            } else if (typeof savedDept === 'string' && savedDept) {
+                setDepartments([savedDept]);
+            } else {
+                setDepartments([]);
+            }
+
             setRegion(query.region);
             setSearchPlatforms(query.searchPlatforms);
             setIncludeSimilarCompanies(query.includeSimilarCompanies || false);
@@ -120,7 +132,7 @@ const App: React.FC = () => {
   const saveSession = (currentLeads: Lead[]) => {
       const session: StoredSession = {
           leads: currentLeads,
-          query: { clientName, category: getFinalCategory(), department, region, searchPlatforms, includeSimilarCompanies, generateOutreachCadence, exclusionList, outreachTone }
+          query: { clientName, category: getFinalCategory(), department: departments, region, searchPlatforms, includeSimilarCompanies, generateOutreachCadence, exclusionList, outreachTone }
       };
       localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
   }
@@ -130,7 +142,7 @@ const App: React.FC = () => {
       setClientName('');
       setCategory('');
       setOtherCategory('');
-      setDepartment('');
+      setDepartments([]);
       setRegion('');
       setSearchPlatforms([]);
       setIncludeSimilarCompanies(false);
@@ -148,14 +160,14 @@ const App: React.FC = () => {
     
     const finalCategory = getFinalCategory();
 
-    if ((!finalCategory && !clientName.trim()) || searchPlatforms.length === 0 || !department || !region) {
-      setError("Please fill all required fields: a client name or category, target department, region, and at least one search platform.");
+    if ((!finalCategory && !clientName.trim()) || searchPlatforms.length === 0 || departments.length === 0 || !region) {
+      setError("Please fill all required fields: a client name or category, at least one target department, region, and at least one search platform.");
       setIsLoading(false);
       return;
     }
 
     try {
-      const generated = await generateLeads(finalCategory, department, searchPlatforms, clientName, region, includeSimilarCompanies, generateOutreachCadence, exclusionList, outreachTone);
+      const generated = await generateLeads(finalCategory, departments, searchPlatforms, clientName, region, includeSimilarCompanies, generateOutreachCadence, exclusionList, outreachTone);
       setLeads(generated);
       saveSession(generated);
     } catch (err) {
@@ -163,13 +175,13 @@ const App: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [getFinalCategory, department, searchPlatforms, clientName, region, includeSimilarCompanies, generateOutreachCadence, exclusionList, outreachTone]);
+  }, [getFinalCategory, departments, searchPlatforms, clientName, region, includeSimilarCompanies, generateOutreachCadence, exclusionList, outreachTone]);
 
   const handleFindLookalikes = useCallback(async (seedLead: Lead, index: number) => {
     setIsLookalikeLoading(index);
     setError(null);
     try {
-        const lookalikes = await findLookalikeLeads(seedLead, region, department, exclusionList);
+        const lookalikes = await findLookalikeLeads(seedLead, region, departments, exclusionList);
         const updatedLeads = [...leads, ...lookalikes];
         setLeads(updatedLeads);
         saveSession(updatedLeads);
@@ -178,7 +190,33 @@ const App: React.FC = () => {
     } finally {
         setIsLookalikeLoading(null);
     }
-  }, [leads, region, department, exclusionList]);
+  }, [leads, region, departments, exclusionList]);
+
+  const handleGenerateOutreach = useCallback(async () => {
+      setIsOutreachLoading(true);
+      setError(null);
+      try {
+          // Identify leads that need outreach generated (or regenerate for all if user clicks)
+          // For efficiency, we process them concurrently
+          const updatedLeads = await Promise.all(leads.map(async (lead) => {
+              // If cadence exists, keep it (or we could force regenerate, but safe to just fill missing)
+              // If the user clicked the button, they likely want it. 
+              // Let's overwrite/generate for all to be safe, or check if missing. 
+              // Given user intent "prompt user so they have option", generating for all 
+              // ensures tone setting is applied.
+              
+              const cadence = await generateOutreachForLead(lead, outreachTone);
+              return { ...lead, outreachCadence: cadence };
+          }));
+
+          setLeads(updatedLeads);
+          saveSession(updatedLeads);
+      } catch (err) {
+          setError(err instanceof Error ? err.message : 'An unknown error occurred while generating outreach.');
+      } finally {
+          setIsOutreachLoading(false);
+      }
+  }, [leads, outreachTone]);
 
   const handleAnalyzeCompetitor = useCallback(async (competitorName: string, leadContext: Lead) => {
     setCompetitorToAnalyze({ name: competitorName, context: leadContext });
@@ -226,7 +264,7 @@ const App: React.FC = () => {
     setScoreExplanationError(null);
   };
 
-  const isFormInvalid = (!getFinalCategory() && !clientName.trim()) || !department || !region || searchPlatforms.length === 0;
+  const isFormInvalid = (!getFinalCategory() && !clientName.trim()) || departments.length === 0 || !region || searchPlatforms.length === 0;
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-200 flex flex-col items-center p-4 sm:p-6 lg:p-8">
@@ -268,7 +306,7 @@ const App: React.FC = () => {
         </header>
 
         <main className="bg-slate-800/50 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-2xl border border-slate-700">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             <div>
               <label htmlFor="clientName" className="block text-sm font-semibold mb-2 text-slate-300">
                 Client Name <span className="text-slate-400">(Optional)</span>
@@ -326,19 +364,33 @@ const App: React.FC = () => {
                 </div>
               )}
             </div>
-            <div>
-              <label htmlFor="department" className="block text-sm font-semibold mb-2 text-slate-300">
-                Target Department
-              </label>
-              <select
-                id="department"
-                value={department}
-                onChange={(e) => setDepartment(e.target.value)}
-                className={`w-full bg-slate-900 border border-slate-600 rounded-lg p-3 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-300 ${!department ? 'text-slate-400' : ''}`}
-              >
-                <option value="" disabled>Select the Department</option>
-                {DepartmentOptions.map(d => <option key={d} value={d}>{d}</option>)}
-              </select>
+          </div>
+
+          <div className="mb-6">
+            <label className="block text-sm font-semibold mb-3 text-slate-300">
+              Target Departments <span className="text-slate-400 text-xs ml-1">(Select multiple)</span>
+            </label>
+            <div className="flex flex-wrap gap-3 p-4 bg-slate-900/50 border border-slate-600 rounded-lg">
+              {DepartmentOptions.map(dept => (
+                <div key={dept} className="flex items-center">
+                  <input
+                    id={`dept-${dept}`}
+                    type="checkbox"
+                    checked={departments.includes(dept)}
+                    onChange={(e) => {
+                        if (e.target.checked) {
+                            setDepartments([...departments, dept]);
+                        } else {
+                            setDepartments(departments.filter(d => d !== dept));
+                        }
+                    }}
+                    className="w-4 h-4 text-purple-600 bg-slate-700 border-slate-500 rounded focus:ring-purple-500 focus:ring-2 cursor-pointer"
+                  />
+                  <label htmlFor={`dept-${dept}`} className="ml-2 text-sm font-medium text-slate-300 cursor-pointer select-none">
+                    {dept}
+                  </label>
+                </div>
+              ))}
             </div>
           </div>
 
@@ -369,9 +421,9 @@ const App: React.FC = () => {
                       type="checkbox"
                       checked={searchPlatforms.includes(platform.id)}
                       onChange={(e) => setSearchPlatforms(prev => prev.includes(platform.id) ? prev.filter(p => p !== platform.id) : [...prev, platform.id])}
-                      className="w-4 h-4 text-purple-600 bg-slate-700 border-slate-500 rounded focus:ring-purple-500 focus:ring-2"
+                      className="w-4 h-4 text-purple-600 bg-slate-700 border-slate-500 rounded focus:ring-purple-500 focus:ring-2 cursor-pointer"
                     />
-                    <label htmlFor={`platform-${platform.id}`} className="ml-2 text-sm font-medium text-slate-300">
+                    <label htmlFor={`platform-${platform.id}`} className="ml-2 text-sm font-medium text-slate-300 cursor-pointer">
                       {platform.name}
                     </label>
                   </div>
@@ -383,9 +435,9 @@ const App: React.FC = () => {
                         type="checkbox"
                         checked={generateOutreachCadence}
                         onChange={(e) => setGenerateOutreachCadence(e.target.checked)}
-                        className="w-4 h-4 text-purple-600 bg-slate-700 border-slate-500 rounded focus:ring-purple-500 focus:ring-2"
+                        className="w-4 h-4 text-purple-600 bg-slate-700 border-slate-500 rounded focus:ring-purple-500 focus:ring-2 cursor-pointer"
                       />
-                      <label htmlFor="generateOutreachCadence" className="ml-2 text-sm font-medium text-slate-300">
+                      <label htmlFor="generateOutreachCadence" className="ml-2 text-sm font-medium text-slate-300 cursor-pointer">
                         Generate Outreach Cadence
                       </label>
                   </div>
@@ -466,6 +518,8 @@ const App: React.FC = () => {
             isLookalikeLoading={isLookalikeLoading}
             onAnalyzeCompetitor={handleAnalyzeCompetitor}
             onExplainScore={handleExplainScore}
+            onGenerateOutreach={handleGenerateOutreach}
+            isOutreachLoading={isOutreachLoading}
           />
         )}
 

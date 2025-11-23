@@ -66,7 +66,7 @@ export interface Lead {
 export interface SearchQuery {
     clientName: string;
     category: string;
-    department: string;
+    department: string[];
     region: string;
     searchPlatforms: string[];
     includeSimilarCompanies: boolean;

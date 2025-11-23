@@ -16,10 +16,10 @@ Abhishek's Inbound: AI Lead Gen Assistant is an intelligent tool designed to aut
 -   **Targeted Company Search:** Initiate a search based on a specific company name or a broader industry category.
 -   **Lookalike Company Discovery:** For any promising lead, the AI can find other similar companies, expanding your prospect list with highly relevant leads.
 -   **Deep-Dive Analysis:** Goes beyond surface-level data to find employee count, latest funding details, the company's tech stack, key competitors, and latest Instagram posts.
--   **Contact Identification:** Pinpoints up to 5 relevant contacts within your specified target department (e.g., Marketing, Sales) for each company.
+-   **Multi-Department Contact ID:** Select multiple departments (e.g., Marketing AND Sales) to find contacts across the organization for each company.
 -   **AI-Powered Lead Scoring:** Each lead is assigned a score from 1-100, providing an at-a-glance metric of its quality based on the strength of its market-entry signals.
 -   **Personalized Outreach Generation:** Creates a compelling, one-sentence "icebreaker" for each lead and can optionally compose a full, ready-to-send outreach email.
--   **Multi-Platform Intelligence:** Gathers data from the web, LinkedIn, and social media (Facebook, X, Instagram, etc.) to build a holistic view of a company's activities and intent.
+-   **Multi-Platform Intelligence:** Gathers data from the web, LinkedIn, and social media (Facebook, X, Instagram, Reddit, etc.) to build a holistic view of a company's activities and intent.
 -   **Data Export:** Easily export all generated data into ".csv", ".xlsx" (with clickable links and multiple sheets for clarity), or copy it for pasting into Google Sheets.
 -   **Session Persistence:** Your last search query and results are automatically saved and reloaded when you reopen the app, allowing you to pick up right where you left off.
 
@@ -36,8 +36,8 @@ Abhishek's Inbound: AI Lead Gen Assistant is an intelligent tool designed to aut
 1.  **Fill the Search Form:**
     *   **Client Name (Optional):** Enter a specific company name for a deep-dive analysis. If you check "Also find similar companies," the AI will research this primary company AND find others like it.
     *   **Client Category:** If you don't have a specific company in mind, choose an industry category to find multiple leads within it.
-    *   **Target Department:** Select the department where you want the AI to find contacts (e.g., Marketing).
-    *   **Search Platforms & Options:** Check the sources you want the AI to use. "Social Media Search (FB, X, Instagram)" will gather social signals. Check "Generate AI Outreach Email" to have a full email composed for each lead.
+    *   **Target Departments:** Check one or multiple departments where you want the AI to find contacts (e.g., Marketing, CEO).
+    *   **Search Platforms & Options:** Check the sources you want the AI to use. "Social Media Search (FB, X, Insta, Reddit)" will gather social signals and community discussions. Check "Generate AI Outreach Email" to have a full email composed for each lead.
     *   **Target Region:** Specify the geographical region of the companies you are targeting.
 
 2.  **Generate Leads:** Click the "Generate Leads" button. The AI will begin its research. This may take a minute or two as it performs a comprehensive analysis.
@@ -70,7 +70,7 @@ This is the detailed task description, built from your form selections.
 
 *This part changes based on your inputs.*
 \`\`\`
-Your primary task is a deep-dive investigation into the company "InnovateTech" in the "Technology" category, which is based in the "USA" region. In addition to this, identify up to 5 other international companies that are similar to "InnovateTech" in business model and category, also from the "USA" region and showing strong potential for Indian market expansion. For all companies found (the primary one and the similar ones), find contacts in the "Marketing" department.
+Your primary task is a deep-dive investigation into the company "InnovateTech" in the "Technology" category, which is based in the "USA" region. In addition to this, identify up to 5 other international companies that are similar to "InnovateTech" in business model and category, also from the "USA" region and showing strong potential for Indian market expansion. For all companies found (the primary one and the similar ones), find contacts in the following departments: "Marketing, Sales".
 
 **IMPORTANT EXCLUSION RULE:** You MUST NOT include any of the following companies in your results, even if they are a perfect match: Competitor A, Old Prospect Inc.
 \`\`\`
@@ -113,13 +113,13 @@ Your primary task is a deep-dive investigation into the company "InnovateTech" i
     - instagramProfileUrl: The full URL to the company's official Instagram profile. Use "N/A" if not found.
     - latestInstagramPosts: An array of up to 5 of the company's most recent Instagram posts. Each object in the array should contain 'caption' and 'url'. The 'url' MUST be a direct, publicly accessible link to the specific post (e.g., https://www.instagram.com/p/Cxyz...). If you can find the post's caption but not its specific URL, use the main instagramProfileUrl as the post's URL. If no profile is found, return an empty array [].
 
-2.  **Contacts (Find up to 5 people in the specified department):**
+2.  **Contacts (Find up to 5 people in the specified departments):**
     For each potential contact, you MUST perform this verification:
     1. Find their LinkedIn profile using a targeted search.
     2. **Verify (ALL MUST BE TRUE):**
         a. **Company:** Current company on LinkedIn EXACTLY matches the researched company.
         b. **Strict Region Match:** The contact's location listed on their LinkedIn profile MUST be within the specified search region. For instance, if the target region is 'UK/Europe', the contact's location must be in a country within the UK or Europe. This is a non-negotiable rule. If a contact's location is outside the target region, you MUST DISCARD them and find another contact who is located within the region.
-        c. **Role:** Job title matches the target department.
+        c. **Role:** Job title matches one of the target departments.
     3. **Result:**
         - **MANDATORY:** If a contact is VERIFIED, you MUST provide their full, valid LinkedIn profile URL for the 'contactLinkedIn' field. It cannot be empty.
         - If you cannot find or verify a contact's LinkedIn profile after a thorough search, use the exact string "Not found" for the 'contactLinkedIn' value. Do not invent a URL.
