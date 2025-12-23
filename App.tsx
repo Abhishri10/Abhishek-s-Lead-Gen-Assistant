@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useEffect } from 'react';
 import { generateLeads, findLookalikeLeads, analyzeCompetitor, explainLeadScore, generateOutreachForLead } from './services/geminiService';
 import type { Lead, StoredSession, CompetitorAnalysis, ScoreExplanation } from './types';
@@ -16,7 +15,7 @@ const SearchPlatformOptions = [
 
 const RegionOptions = ['Global', 'APAC', 'UK/Europe', 'USA', 'Canada', 'MENA', 'Africa'];
 const DepartmentOptions = ['Marketing', 'International Marketing', 'Sales', 'CEO', 'Business Head', 'COO'];
-const CategoryOptions = ['Airlines', 'Food', 'Retail', 'Technology', 'Travel & Tourism', 'Gaming & Betting', 'Education', 'Others'];
+const CategoryOptions = ['Airlines', 'Food', 'Retail', 'AI & Technology', 'Travel & Tourism', 'Gaming & Betting', 'Education', 'Others'];
 const OutreachToneOptions = ['Default (Professional)', 'Formal', 'Casual & Friendly', 'Direct & Concise'];
 
 const SESSION_STORAGE_KEY = 'leadGenSession';
@@ -43,6 +42,7 @@ const App: React.FC = () => {
   const [generateOutreachCadence, setGenerateOutreachCadence] = useState(false);
   const [outreachTone, setOutreachTone] = useState(OutreachToneOptions[0]);
   const [exclusionList, setExclusionList] = useState('');
+  const [isAiSaas, setIsAiSaas] = useState(false);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isLookalikeLoading, setIsLookalikeLoading] = useState<number | null>(null);
@@ -81,7 +81,10 @@ const App: React.FC = () => {
             setClientName(query.clientName);
             
             const savedCategory = query.category;
-            if (CategoryOptions.includes(savedCategory)) {
+            // Handle backward compatibility for renamed category
+            if (savedCategory === 'Technology') {
+                setCategory('AI & Technology');
+            } else if (CategoryOptions.includes(savedCategory)) {
                 setCategory(savedCategory);
             } else if (savedCategory) { // Custom category was saved
                 setCategory('Others');
@@ -106,6 +109,7 @@ const App: React.FC = () => {
             setGenerateOutreachCadence(query.generateOutreachCadence || false);
             setOutreachTone(query.outreachTone || OutreachToneOptions[0]);
             setExclusionList(query.exclusionList || '');
+            setIsAiSaas(query.isAiSaas || false);
         }
     } catch (e) {
         console.error("Failed to load saved session", e);
@@ -132,7 +136,7 @@ const App: React.FC = () => {
   const saveSession = (currentLeads: Lead[]) => {
       const session: StoredSession = {
           leads: currentLeads,
-          query: { clientName, category: getFinalCategory(), department: departments, region, searchPlatforms, includeSimilarCompanies, generateOutreachCadence, exclusionList, outreachTone }
+          query: { clientName, category: getFinalCategory(), department: departments, region, searchPlatforms, includeSimilarCompanies, generateOutreachCadence, exclusionList, outreachTone, isAiSaas }
       };
       localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
   }
@@ -149,6 +153,7 @@ const App: React.FC = () => {
       setGenerateOutreachCadence(false);
       setOutreachTone(OutreachToneOptions[0]);
       setExclusionList('');
+      setIsAiSaas(false);
       setError(null);
       localStorage.removeItem(SESSION_STORAGE_KEY);
   }
@@ -167,7 +172,7 @@ const App: React.FC = () => {
     }
 
     try {
-      const generated = await generateLeads(finalCategory, departments, searchPlatforms, clientName, region, includeSimilarCompanies, generateOutreachCadence, exclusionList, outreachTone);
+      const generated = await generateLeads(finalCategory, departments, searchPlatforms, clientName, region, includeSimilarCompanies, generateOutreachCadence, exclusionList, outreachTone, isAiSaas);
       setLeads(generated);
       saveSession(generated);
     } catch (err) {
@@ -175,7 +180,7 @@ const App: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, [getFinalCategory, departments, searchPlatforms, clientName, region, includeSimilarCompanies, generateOutreachCadence, exclusionList, outreachTone]);
+  }, [getFinalCategory, departments, searchPlatforms, clientName, region, includeSimilarCompanies, generateOutreachCadence, exclusionList, outreachTone, isAiSaas]);
 
   const handleFindLookalikes = useCallback(async (seedLead: Lead, index: number) => {
     setIsLookalikeLoading(index);
@@ -196,15 +201,7 @@ const App: React.FC = () => {
       setIsOutreachLoading(true);
       setError(null);
       try {
-          // Identify leads that need outreach generated (or regenerate for all if user clicks)
-          // For efficiency, we process them concurrently
           const updatedLeads = await Promise.all(leads.map(async (lead) => {
-              // If cadence exists, keep it (or we could force regenerate, but safe to just fill missing)
-              // If the user clicked the button, they likely want it. 
-              // Let's overwrite/generate for all to be safe, or check if missing. 
-              // Given user intent "prompt user so they have option", generating for all 
-              // ensures tone setting is applied.
-              
               const cadence = await generateOutreachForLead(lead, outreachTone);
               return { ...lead, outreachCadence: cadence };
           }));
@@ -341,12 +338,31 @@ const App: React.FC = () => {
               <select
                 id="category"
                 value={category}
-                onChange={(e) => setCategory(e.target.value)}
+                onChange={(e) => {
+                    setCategory(e.target.value);
+                    if (e.target.value !== 'AI & Technology') {
+                        setIsAiSaas(false);
+                    }
+                }}
                 className={`w-full bg-slate-900 border border-slate-600 rounded-lg p-3 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-300 ${!category ? 'text-slate-400' : ''}`}
               >
                 <option value="" disabled>Select the Category</option>
                 {CategoryOptions.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
+              {category === 'AI & Technology' && (
+                  <div className="mt-3 flex items-center animate-fadeIn">
+                    <input
+                        id="isAiSaas"
+                        type="checkbox"
+                        checked={isAiSaas}
+                        onChange={(e) => setIsAiSaas(e.target.checked)}
+                        className="w-4 h-4 text-purple-600 bg-slate-700 border-slate-500 rounded focus:ring-purple-500 focus:ring-2 cursor-pointer"
+                    />
+                    <label htmlFor="isAiSaas" className="ml-2 text-sm font-medium text-slate-300 cursor-pointer select-none">
+                        AI- SAAS Companies
+                    </label>
+                  </div>
+              )}
               {category === 'Others' && (
                 <div className="mt-3">
                   <label htmlFor="otherCategory" className="block text-xs font-semibold mb-1 text-slate-400">

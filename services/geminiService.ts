@@ -1,4 +1,3 @@
-
 import { GoogleGenAI } from "@google/genai";
 import type { Lead, CompetitorAnalysis, ScoreExplanation, OutreachStep } from '../types';
 
@@ -7,6 +6,8 @@ if (!process.env.API_KEY) {
 }
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
+const ZEE_VALUE_PROP = "At ZEE, we’ve helped global brands enter and scale in India by building consideration beyond price-using data-driven targeting, high-impact storytelling, premium contexts, and performance-led funnels. Our portfolio includes 50+ linear channels, ZEE5 (OTT), multiple digital genre platforms, and a news network spanning global, national, and regional audiences.";
 
 // Helper function to robustly extract JSON from mixed text
 const extractJson = (text: string, isArray: boolean): string => {
@@ -129,7 +130,8 @@ export const generateLeads = async (
     includeSimilar: boolean,
     generateOutreachCadence: boolean,
     exclusionList: string,
-    outreachTone: string
+    outreachTone: string,
+    isAiSaas: boolean
 ): Promise<Lead[]> => {
   if ((!category.trim() && !clientName.trim()) || departments.length === 0 || platforms.length === 0) {
     return [];
@@ -194,6 +196,26 @@ export const generateLeads = async (
         4. **Capacity:** Look for news about "increasing frequency" or "upgrading aircraft" to India routes.
         `;
     }
+    
+    if (category === 'AI & Technology' || category === 'Technology') {
+        if (isAiSaas) {
+            taskDescription += `\n\n**IMPORTANT FOR AI-SAAS COMPANIES:**
+            1. **Active Usage & Service Offering:** Prioritize AI & SaaS companies (GenAI, Automation, Video/Image generation tools like Kling AI, RunwayML, Midjourney, Jasper, etc.) that operate globally and are seeing significant adoption or offering services in India.
+            2. **Adoption Signals:** Look for "Indian users using [Tool Name]", "How to buy [Tool Name] in India", or specific India-tier pricing/support.
+            3. **Market Penetration:** Even if they don't have a physical office, if they are accepting payments from India or have a large Indian user base discussing them on social media (Reddit, Twitter), they are a valid lead.
+            4. **Focus:** Specifically look for software-as-a-service platforms driven by AI.
+            `;
+             if (platforms.includes('socialMedia')) {
+                 platformInstructions += `- **AI Community Intel:** Search \`site:reddit.com "r/ArtificialInteligence" "India" OR "r/IndianDevelopers" "using [AI Tool]"\` to find tools gaining traction.\n`;
+            }
+        } else {
+             taskDescription += `\n\n**IMPORTANT FOR GENERAL TECHNOLOGY:**
+            1. **Enterprise & IT Services:** Prioritize global technology firms (Cloud Infrastructure, Cybersecurity, Enterprise Software, Fintech, Hardware) establishing or expanding their presence in India (e.g., GCC setup, new R&D centers).
+            2. **Physical Presence:** Unlike SaaS, look for concrete signals of physical expansion like "opening new office in Bangalore/Hyderabad", "hiring Country Head", or "registering Indian subsidiary".
+            3. **B2B Focus:** Focus on companies selling technology solutions to Indian enterprises or consumers (e.g., Consumer Electronics brands entering India).
+            `;
+        }
+    }
 
     if (exclusionList.trim()) {
       taskDescription += `\n\n**IMPORTANT EXCLUSION RULE:** You MUST NOT include any of the following companies in your results, even if they are a perfect match: ${exclusionList.trim()}.`;
@@ -241,18 +263,24 @@ export const generateLeads = async (
       : '';
       
     currentDataGatheringRules += `
-    - outreachCadence: An array of 2-3 personalized, professional outreach email objects ready to send.${toneInstruction} Each object must contain 'step', 'subject', and 'body'. The sequence should be a logical progression (e.g., initial outreach, gentle follow-up). The first email should use the 'outreachSuggestion' as an opener, briefly expand on the 'justification' and 'marketEntrySignals' to show you've done your research, explain a value proposition for Indian expansion, and end with a clear, low-friction call-to-action. The email should be addressed to the primary contact you've identified.`;
+    - outreachCadence: An array of 2-3 personalized, professional outreach email objects ready to send.${toneInstruction} Each object must contain 'step', 'subject', and 'body'. The sequence should be a logical progression (e.g., initial outreach, gentle follow-up).
+    
+    **MANDATORY CONTENT INTEGRATION:** You are writing on behalf of **ZEE**. You MUST integrate the following value proposition into the emails **subtly and naturally** to avoid repetition. Do not simply paste this block; weave the specific assets (ZEE5, linear channels, news network) into the context of helping the lead scale in India:
+    "${ZEE_VALUE_PROP}"
+    
+    The first email should use the 'outreachSuggestion' as an opener, briefly expand on the 'justification' and 'marketEntrySignals', and position ZEE's media portfolio as the engine for their Indian market entry. End with a clear, low-friction call-to-action.`;
+
     jsonExampleFields += `,
   "outreachCadence": [
       { 
           "step": 1, 
-          "subject": "Exploring Example Corp's Expansion into India", 
-          "body": "Hi Jane Doe,\\n\\nI saw your recent press release about expanding into the APAC region and was very impressed with your growth. Given your focus on global markets, the Indian market seems like a significant opportunity for Example Corp.\\n\\nMy company specializes in helping Technology companies like yours successfully launch in India, navigating the unique market landscape to drive rapid growth.\\n\\nWould you be open to a brief 15-minute call next week to explore how we could support your potential expansion?\\n\\nBest regards,\\n[Your Name]"
+          "subject": "Scaling Example Corp in India via ZEE", 
+          "body": "Hi Jane Doe,\\n\\nI saw your recent press release about expanding into the APAC region and was very impressed with your growth. Given your focus on global markets, the Indian market seems like a significant opportunity for Example Corp.\\n\\nAt ZEE, we’ve helped global brands like yours enter India by building consideration beyond price. We can leverage our 50+ linear channels and ZEE5 OTT platform to drive precise awareness for your product launch.\\n\\nWould you be open to a brief 15-minute call next week to explore how we could support your potential expansion?\\n\\nBest regards,\\n[Your Name]"
       },
       {
           "step": 2,
-          "subject": "Re: Exploring Example Corp's Expansion into India",
-          "body": "Hi Jane Doe,\\n\\nJust wanted to gently follow up on my previous email. I'm confident that our market-entry strategies could greatly benefit Example Corp as you continue your APAC expansion.\\n\\nI'd be happy to share a brief case study on how we helped a similar company achieve a 200% ROI in their first year in India. Let me know if that's of interest.\\n\\nBest regards,\\n[Your Name]"
+          "subject": "Re: Scaling Example Corp in India via ZEE", 
+          "body": "Hi Jane Doe,\\n\\nJust wanted to gently follow up on my previous email. I'm confident that our data-driven targeting and high-impact storytelling capabilities could greatly benefit Example Corp as you continue your APAC expansion.\\n\\nI'd be happy to share a brief case study on how we helped a similar company achieve a 200% ROI using our performance-led funnels. Let me know if that's of interest.\\n\\nBest regards,\\n[Your Name]"
       }
   ]`
   }
@@ -474,7 +502,8 @@ export const generateOutreachForLead = async (lead: Lead, tone: string): Promise
 
     const prompt = `
     Context:
-    My company helps international businesses successfully launch and expand into the Indian market.
+    You are a sales leader at **ZEE**.
+    Your Value Proposition: "${ZEE_VALUE_PROP}"
     
     Target Lead:
     - Company: ${lead.companyName}
@@ -487,9 +516,14 @@ export const generateOutreachForLead = async (lead: Lead, tone: string): Promise
     Write a sequence of 2 emails (an initial outreach and a follow-up) addressed to ${contactPerson.contactName}.
     Tone: ${tone}
     
+    **Instruction:**
+    Weave the ZEE value proposition provided above into the emails in a **subtle, non-repetitive manner**. 
+    - Don't just copy-paste the whole paragraph. 
+    - Instead, mention relevant assets (e.g., "leverage our 50+ linear channels", "target via ZEE5 OTT", "high-impact storytelling") that specifically align with the lead's industry and expansion goals.
+    
     Structure:
-    Email 1: Use the icebreaker, reference their expansion signals to show research, propose a value add regarding their India entry, and ask for a call.
-    Email 2: A gentle, professional follow-up sent 3 days later, perhaps offering a case study or value nugget.
+    Email 1: Use the icebreaker -> Reference expansion signals -> Introduce ZEE as the partner to build consideration beyond price -> CTA.
+    Email 2: Gentle follow-up -> Mention specific ZEE assets (News network or Digital platforms) as a way to reach their audience -> CTA.
 
     Output Format:
     Return a valid JSON array of objects. Each object must have:

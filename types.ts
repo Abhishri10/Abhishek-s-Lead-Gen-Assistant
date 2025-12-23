@@ -73,6 +73,7 @@ export interface SearchQuery {
     generateOutreachCadence: boolean;
     exclusionList: string;
     outreachTone: string;
+    isAiSaas?: boolean;
 }
 
 export interface StoredSession {
