@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { DownloadIcon } from './Icons';
+import { DownloadIcon, DocumentIcon } from './Icons';
 
 declare var jspdf: any;
 
@@ -47,133 +47,14 @@ Abhishek's Inbound: AI Lead Gen Assistant is an intelligent tool designed to aut
     *   **Deep Dive:** Click the chevron (v) icon in the "Actions" column to expand a row and see detailed information like funding, tech stack, competitors, and recent Instagram posts.
     *   **Find Lookalikes:** Click the sparkles icon (✨) to task the AI with finding more companies similar to that specific lead.
     *   **Export:** Use the buttons at the top right of the results table to download your data in your preferred format. The .xlsx file contains separate, detailed sheets for news and Instagram posts.
+`;
 
-## 5. Core AI Prompt Architecture
+const appOverviewDocContent = `
+Abhishek's Inbound: AI Lead Gen Assistant is a next-generation sales intelligence platform designed to bridge the gap between global innovations and the Indian market. Built on a modern tech stack comprising React 19, Tailwind CSS, and powered by the cutting-edge Google Gemini 2.5-Flash model, the app functions as a sophisticated data scraper and researcher.
 
-This is the exact blueprint used to instruct the Gemini model. It's constructed dynamically based on your form inputs.
+The platform specializes in identifying high-intent international leads—particularly in the 'AI & Technology' sector—by scanning LinkedIn, Social Media (Reddit, X, Instagram), and global news networks. It detects subtle expansion signals, such as hiring for India-specific roles or community adoption of tools like Kling AI and RunwayML.
 
----
-
-### 5.1. System Instruction
-
-This high-level directive sets the AI's persona and overall goal for every request.
-
-\`\`\`
-You are a world-class lead generation expert and sales strategist. Your purpose is to identify international companies showing strong potential for expanding into the Indian market. For each company, you must perform deep analysis to score the lead's quality and provide a personalized outreach suggestion. You must follow all instructions precisely and return data ONLY in the specified JSON array format.
-\`\`\`
-
-### 5.2. Main Content Prompt
-
-This is the detailed task description, built from your form selections.
-
-#### A. Task Description (Example)
-
-*This part changes based on your inputs.*
-\`\`\`
-Your primary task is a deep-dive investigation into the company "InnovateTech" in the "Technology" category, which is based in the "USA" region. In addition to this, identify up to 5 other international companies that are similar to "InnovateTech" in business model and category, also from the "USA" region and showing strong potential for Indian market expansion. For all companies found (the primary one and the similar ones), find contacts in the following departments: "Marketing, Sales".
-
-**IMPORTANT EXCLUSION RULE:** You MUST NOT include any of the following companies in your results, even if they are a perfect match: Competitor A, Old Prospect Inc.
-\`\`\`
-
-#### B. Search Methods
-
-*This part is built from the "Search Platforms" checkboxes.*
-\`\`\`
-**Search Methods:**
-- In-depth Web Search: Look for news, press releases, or reports about international expansion, funding for emerging markets, or partnerships in the Asia-Pacific region.
-- LinkedIn: Scan for companies posting jobs in India or showing increased engagement from Indian professionals.
-- Social Media (Facebook, X, Instagram, Reddit, etc.): Analyze mentions, discussions, and official posts from Indian users or related to Indian market interest to gauge organic engagement and expansion signals.
-\`\`\`
-
-#### C. Data Gathering & Verification Rules
-
-*These are the strict rules the AI must follow for data collection and contact verification.*
-\`\`\`
-**Data Gathering Rules:**
-
-**For each identified company:**
-1.  **Company Info & Deep-Dive Analysis:**
-    - companyName: Official name.
-    - companyLinkedIn: Full LinkedIn URL.
-    - category: Company's industry.
-    - email: Find a public contact email from the company's official site. Use "N/A" if none.
-    - phone: Find a public phone number from the company's official site. Use "N/A" if none.
-    - justification: A brief, high-level summary (2-3 sentences) of why this company is a strong lead for Indian market expansion.
-    - marketEntrySignals: An array of 3-5 specific, verifiable bullet points that support the justification (e.g., "Recent $50M funding for global expansion", "Job posting for Head of Sales, India", "CEO mentioned APAC focus in a recent podcast").
-    - leadScore: A numerical score from 1-100 indicating the strength of the lead, where 100 is the strongest. Base this on the recency and relevance of their expansion signals (e.g., recent funding, job postings, official announcements).
-    - outreachSuggestion: A single, compelling sentence to use as a personalized icebreaker in an outreach email, directly referencing the 'justification' and 'marketEntrySignals'.
-    - employeeCount: Estimated number of employees (e.g., "51-200").
-    - latestFunding: Details of the most recent funding round (e.g., "$50M Series B - Oct 2023"). Use "N/A" if not found.
-    - techStack: An array of key technologies the company uses (e.g., ["Salesforce", "AWS", "Shopify"]).
-    - competitors: An array of 2-3 main competitors.
-    - swotAnalysis: An object with four arrays of strings: 'strengths', 'weaknesses', 'opportunities', and 'threats'. Each array should contain 2-3 brief bullet points analyzing the company's potential for Indian market entry.
-    - painPointAnalysis: An array of 2-3 potential business pain points. For each, identify a specific 'painPoint' the company likely faces (based on SWOT analysis, industry trends, or recent news) and a 'suggestedSolution' which is a one-sentence pitch on how your service could solve it.
-    - latestNews: An object containing the 'title' and 'url' of the most recent, relevant general news article about the company (e.g. funding, product launch). The URL must be a direct link. If none, return an object with "N/A" for both title and url.
-    - latestIndiaNews: An object containing the 'title' and 'url' of the most recent news, press release, or significant public statement specifically mentioning the company's interest, plans, or activities related to the Indian market. The URL must be a direct link. If no such specific news is found, return an object with "N/A" for both title and url.
-    - instagramProfileUrl: The full URL to the company's official Instagram profile. Use "N/A" if not found.
-    - latestInstagramPosts: An array of up to 5 of the company's most recent Instagram posts. Each object in the array should contain 'caption' and 'url'. The 'url' MUST be a direct, publicly accessible link to the specific post (e.g., https://www.instagram.com/p/Cxyz...). If you can find the post's caption but not its specific URL, use the main instagramProfileUrl as the post's URL. If no profile is found, return an empty array [].
-
-2.  **Contacts (Find up to 5 people in the specified departments):**
-    For each potential contact, you MUST perform this verification:
-    1. Find their LinkedIn profile using a targeted search.
-    2. **Verify (ALL MUST BE TRUE):**
-        a. **Company:** Current company on LinkedIn EXACTLY matches the researched company.
-        b. **Strict Region Match:** The contact's location listed on their LinkedIn profile MUST be within the specified search region. For instance, if the target region is 'UK/Europe', the contact's location must be in a country within the UK or Europe. This is a non-negotiable rule. If a contact's location is outside the target region, you MUST DISCARD them and find another contact who is located within the region.
-        c. **Role:** Job title matches one of the target departments.
-    3. **Result:**
-        - **MANDATORY:** If a contact is VERIFIED, you MUST provide their full, valid LinkedIn profile URL for the 'contactLinkedIn' field. It cannot be empty.
-        - If you cannot find or verify a contact's LinkedIn profile after a thorough search, use the exact string "Not found" for the 'contactLinkedIn' value. Do not invent a URL.
-        - If a contact fails the verification check at any step, DISCARD them immediately and find a different person who meets all criteria.
-\`\`\`
-
-#### D. Output Format & Example
-
-*This ensures the AI returns data in a structured, machine-readable format that the application can parse.*
-\`\`\`
-**Output Format:**
-Your entire response MUST be a single, valid JSON array of lead objects. Do NOT include any text, explanations, or markdown before or after the array. The response must start with '[' and end with ']'. All strings must be properly JSON-escaped.
-
-**Example Object:**
-{
-  "companyName": "Example Corp",
-  "category": "Technology",
-  "companyLinkedIn": "https://www.linkedin.com/company/example-corp",
-  "justification": "Recent press releases and a new funding round strongly indicate a push towards global expansion, with APAC being a specifically mentioned target market.",
-  "marketEntrySignals": ["Raised $25M Series C for 'global expansion'", "Job posting for 'Business Development Manager, APAC'", "Partnered with a logistics firm in Singapore"],
-  "email": "contact@example.com",
-  "phone": "+1-555-123-4567",
-  "leadScore": 85,
-  "outreachSuggestion": "I saw your recent press release about expanding into the APAC region and was very impressed with your growth.",
-  "employeeCount": "201-500",
-  "latestFunding": "$25M Series C - Jan 2024",
-  "techStack": ["React", "Node.js", "Google Cloud"],
-  "competitors": ["Competitor Inc", "Another Corp"],
-  "swotAnalysis": {
-      "strengths": ["Strong brand recognition", "Innovative product line"],
-      "weaknesses": ["No existing physical presence in Asia", "Pricing may be high for the Indian market"],
-      "opportunities": ["Large untapped consumer base in India", "Growing demand for high-tech solutions"],
-      "threats": ["Intense local competition", "Complex regulatory landscape"]
-  },
-  "painPointAnalysis": [
-      {
-          "painPoint": "Difficulty navigating complex Indian import regulations, potentially delaying market entry.",
-          "suggestedSolution": "Our local logistics expertise can streamline your customs clearance process, ensuring a faster launch."
-      },
-      {
-          "painPoint": "High customer acquisition costs in a competitive, price-sensitive market.",
-          "suggestedSolution": "We can help you implement a targeted digital marketing strategy that lowers your cost-per-lead by up to 30%."
-      }
-  ],
-  "latestNews": { "title": "Example Corp Raises $25M for Global Expansion", "url": "https://www.example.com/news/series-c" },
-  "latestIndiaNews": { "title": "Example Corp Partners with Indian Distributor", "url": "https://www.example.com/news/india-partnership" },
-  "instagramProfileUrl": "https://www.instagram.com/examplecorp",
-  "latestInstagramPosts": [{ "caption": "Our new product launch!", "url": "https://www.instagram.com/p/Cxyz..." }, { "caption": "Team photo from the annual offsite!", "url": "https://www.instagram.com/p/Cabc..." }],
-  "contacts": [
-    { "contactName": "Jane Doe", "designation": "VP of Marketing", "contactLinkedIn": "https://www.linkedin.com/in/janedoe-example" },
-    { "contactName": "John Smith", "designation": "Marketing Director", "contactLinkedIn": "Not found" }
-  ]
-}
-\`\`\`
+Our Unique Selling Proposition (USP) lies in the depth of our automated research. Unlike traditional lead lists, this tool provides full SWOT analyses, verified decision-maker contacts across multiple departments, and pain-point mappings. Furthermore, it automates the creation of personalized outreach cadences that subtly weave in the ZEE value proposition, highlighting assets like ZEE5 and its massive news network spanning 50+ channels. With features like lead scoring and lookalike discovery, Abhishek's Inbound empowers sales teams to move beyond cold calling into high-impact, data-driven storytelling and targeted performance funnels.
 `;
 
 interface DocumentationProps {
@@ -182,7 +63,7 @@ interface DocumentationProps {
 
 const Documentation: React.FC<DocumentationProps> = ({ onClose }) => {
 
-  const handleDownload = () => {
+  const handleDownloadPDF = () => {
     const { jsPDF } = jspdf;
     const doc = new jsPDF();
     const pageHeight = doc.internal.pageSize.height;
@@ -192,30 +73,17 @@ const Documentation: React.FC<DocumentationProps> = ({ onClose }) => {
     let cursorY = margin;
 
     const addText = (text: string, options: { size?: number; style?: string; indent?: number; isCode?: boolean }) => {
-        // Add new page if cursor is at the bottom
         if (cursorY > pageHeight - margin) {
             doc.addPage();
             cursorY = margin;
         }
-
         const { size = 10, style = 'normal', indent = 0, isCode = false } = options;
-        
         doc.setFontSize(size);
-        
-        if (isCode) {
-            doc.setFont('courier', 'normal');
-        } else {
-            doc.setFont('helvetica', style);
-        }
-
+        if (isCode) { doc.setFont('courier', 'normal'); } else { doc.setFont('helvetica', style); }
         const lines = doc.splitTextToSize(text, maxLineWidth - indent);
         doc.text(lines, margin + indent, cursorY);
-        
-        // Calculate height of the text block
         const textHeight = (lines.length * (size * 0.35)) + 2;
         cursorY += textHeight;
-
-        // Check again if new page is needed after adding text
         if (cursorY > pageHeight - margin) {
             doc.addPage();
             cursorY = margin;
@@ -224,46 +92,39 @@ const Documentation: React.FC<DocumentationProps> = ({ onClose }) => {
 
     const lines = documentationContent.split('\n');
     let inCodeBlock = false;
-
     for (const line of lines) {
         if (line.trim() === '---') {
-            cursorY += 5;
-            doc.setDrawColor(203, 213, 225); // slate-300
-            doc.line(margin, cursorY, pageWidth - margin, cursorY);
-            cursorY += 5;
-            continue;
+            cursorY += 5; doc.setDrawColor(203, 213, 225); doc.line(margin, cursorY, pageWidth - margin, cursorY); cursorY += 5; continue;
         }
-        if (line.trim().startsWith('\`\`\`')) {
-            inCodeBlock = !inCodeBlock;
-            cursorY += 2; 
-            continue;
-        }
-
-        if (inCodeBlock) {
-            // Remove leading spaces for better alignment in code block
-            addText(line.replace(/^ /g, ''), { isCode: true, size: 8 });
-        } else if (line.startsWith("# Abhishek's Inbound")) {
-            addText(line.substring(2), { size: 18, style: 'bold' });
-            cursorY += 2;
-        } else if (line.startsWith('## ')) {
-            cursorY += 6;
-            addText(line.substring(3), { size: 14, style: 'bold' });
-            cursorY += 2;
-        } else if (line.startsWith('### ')) {
-            cursorY += 4;
-            addText(line.substring(4), { size: 12, style: 'bold' });
-             cursorY += 1;
-        } else if (line.startsWith('-   ')) {
-            addText(`• ${line.substring(4)}`, { indent: 5 });
-        } else if (line.trim() === '') {
-            cursorY += 4; // Add space for empty lines
-        }
-        else {
-            addText(line, {});
-        }
+        if (line.trim().startsWith('```')) { inCodeBlock = !inCodeBlock; cursorY += 2; continue; }
+        if (inCodeBlock) { addText(line.replace(/^ /g, ''), { isCode: true, size: 8 }); }
+        else if (line.startsWith("# Abhishek's Inbound")) { addText(line.substring(2), { size: 18, style: 'bold' }); cursorY += 2; }
+        else if (line.startsWith('## ')) { cursorY += 6; addText(line.substring(3), { size: 14, style: 'bold' }); cursorY += 2; }
+        else if (line.startsWith('### ')) { cursorY += 4; addText(line.substring(4), { size: 12, style: 'bold' }); cursorY += 1; }
+        else if (line.startsWith('-   ')) { addText(`• ${line.substring(4)}`, { indent: 5 }); }
+        else if (line.trim() === '') { cursorY += 4; }
+        else { addText(line, {}); }
     }
+    doc.save('Abhisheks_Inbound_Documentation.pdf');
+  };
 
-    doc.save('Abhisheks_Inbound_Lead_Gen_Assistant_Documentation.pdf');
+  const handleDownloadDoc = () => {
+    const header = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+    <head><meta charset='utf-8'><title>App Overview</title></head><body>
+    <h1 style="text-align: center; color: #4F46E5;">Abhishek's Inbound: AI Lead Gen Assistant - Overview</h1>
+    <p style="font-family: Arial, sans-serif; line-height: 1.6;">${appOverviewDocContent.replace(/\n/g, '<br>')}</p>
+    </body></html>`;
+    
+    const blob = new Blob(['\ufeff', header], {
+        type: 'application/msword'
+    });
+    
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'App_Overview_Abhisheks_Inbound.doc';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   return (
@@ -273,17 +134,20 @@ const Documentation: React.FC<DocumentationProps> = ({ onClose }) => {
     >
       <div 
         className="bg-slate-800 border border-slate-700 rounded-lg shadow-2xl w-full max-w-4xl h-[90vh] flex flex-col"
-        onClick={e => e.stopPropagation()} // Prevent closing when clicking inside the modal
+        onClick={e => e.stopPropagation()}
       >
         <header className="flex justify-between items-center p-4 border-b border-slate-700 flex-shrink-0">
           <h2 className="text-xl font-bold text-slate-100">Application Documentation</h2>
-          <div className="flex items-center gap-4">
-             <button onClick={handleDownload} className="flex items-center gap-2 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg shadow-md transition-colors duration-300">
-                <DownloadIcon className="w-5 h-5" /> <span>Download (.pdf)</span>
+          <div className="flex items-center gap-2">
+             <button onClick={handleDownloadDoc} className="flex items-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg shadow-md transition-colors duration-300">
+                <DocumentIcon className="w-5 h-5" /> <span>Overview (.doc)</span>
+            </button>
+             <button onClick={handleDownloadPDF} className="flex items-center gap-2 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg shadow-md transition-colors duration-300">
+                <DownloadIcon className="w-5 h-5" /> <span>Full Docs (.pdf)</span>
             </button>
             <button
               onClick={onClose}
-              className="text-slate-400 hover:text-white transition-colors"
+              className="text-slate-400 hover:text-white transition-colors ml-2"
               title="Close"
             >
               <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
@@ -292,11 +156,19 @@ const Documentation: React.FC<DocumentationProps> = ({ onClose }) => {
             </button>
           </div>
         </header>
-        <pre className="p-6 overflow-y-auto whitespace-pre-wrap font-sans text-slate-300 text-sm flex-grow">
-            <code>
-                {documentationContent}
-            </code>
-        </pre>
+        <div className="p-6 overflow-y-auto font-sans text-slate-300 text-sm flex-grow bg-slate-900/30">
+            <div className="prose prose-invert max-w-none">
+                <pre className="whitespace-pre-wrap font-sans">
+                    <code>{documentationContent}</code>
+                </pre>
+                <div className="mt-8 pt-8 border-t border-slate-700">
+                    <h2 className="text-xl font-bold text-white mb-4">App Overview Summary (200 Words)</h2>
+                    <p className="italic leading-relaxed">
+                        {appOverviewDocContent}
+                    </p>
+                </div>
+            </div>
+        </div>
       </div>
     </div>
   );

@@ -1,43 +1,45 @@
+
 import React, { useState, useCallback, useEffect } from 'react';
-import { generateLeads, findLookalikeLeads, analyzeCompetitor, explainLeadScore, generateOutreachForLead } from './services/geminiService';
+import { generateLeads, findLookalikeLeads, analyzeCompetitor, explainLeadScore, enrichLead } from './services/geminiService';
 import type { Lead, StoredSession, CompetitorAnalysis, ScoreExplanation } from './types';
 import LeadResultsTable from './components/LeadResultsTable';
 import Documentation from './components/Documentation';
 import CompetitorAnalysisModal from './components/CompetitorAnalysisModal';
 import ScoreExplanationModal from './components/ScoreExplanationModal';
-import { SparklesIcon, BookOpenIcon } from './components/Icons';
+import { SparklesIcon, BookOpenIcon, CheckIcon } from './components/Icons';
 
 const SearchPlatformOptions = [
-  { id: 'generalWeb', name: 'In-depth Web Search' },
+  { id: 'generalWeb', name: 'Web Search' },
   { id: 'linkedIn', name: 'LinkedIn' },
-  { id: 'socialMedia', name: 'Social Media Search (FB, X, Insta, Reddit)' }
+  { id: 'facebook', name: 'Facebook' },
+  { id: 'instagram', name: 'Instagram' },
+  { id: 'x_twitter', name: 'X (Twitter)' },
+  { id: 'pinterest', name: 'Pinterest' },
+  { id: 'reddit', name: 'Reddit' }
 ];
 
 const RegionOptions = ['Global', 'APAC', 'UK/Europe', 'USA', 'Canada', 'MENA', 'Africa'];
 const DepartmentOptions = ['Marketing', 'International Marketing', 'Sales', 'CEO', 'Business Head', 'COO'];
-const CategoryOptions = ['Airlines', 'Food', 'Retail', 'AI & Technology', 'Travel & Tourism', 'Gaming & Betting', 'Education', 'Others'];
+const CategoryOptions = ['Airlines', 'Food', 'Beverages', 'Retail', 'AI & Technology', 'Travel & Tourism', 'Gaming & Betting', 'Education', 'Others'];
 const OutreachToneOptions = ['Default (Professional)', 'Formal', 'Casual & Friendly', 'Direct & Concise'];
 
 const SESSION_STORAGE_KEY = 'leadGenSession';
 
 const loadingMessages = [
-  "Scanning web for expansion signals...",
-  "Analyzing company data and SWOT...",
-  "Cross-referencing LinkedIn profiles...",
-  "Identifying key decision-makers...",
-  "Generating multi-step outreach cadence...",
-  "Compiling deep-dive analysis...",
-  "Scoring lead potential...",
-  "Finalizing results..."
+  "Scraping current 2025 expansion signals...",
+  "Cross-referencing LinkedIn recency...",
+  "Identifying decision makers...",
+  "Filtering for high-intent signals...",
+  "Building discovery list..."
 ];
 
 const App: React.FC = () => {
   const [clientName, setClientName] = useState('');
-  const [category, setCategory] = useState('');
+  const [category, setCategory] = useState('AI & Technology');
   const [otherCategory, setOtherCategory] = useState('');
-  const [departments, setDepartments] = useState<string[]>([]);
-  const [region, setRegion] = useState('');
-  const [searchPlatforms, setSearchPlatforms] = useState<string[]>([]);
+  const [departments, setDepartments] = useState<string[]>(['Marketing', 'CEO']);
+  const [region, setRegion] = useState('Global');
+  const [searchPlatforms, setSearchPlatforms] = useState<string[]>(['generalWeb', 'linkedIn', 'reddit']);
   const [includeSimilarCompanies, setIncludeSimilarCompanies] = useState(false);
   const [generateOutreachCadence, setGenerateOutreachCadence] = useState(false);
   const [outreachTone, setOutreachTone] = useState(OutreachToneOptions[0]);
@@ -46,73 +48,49 @@ const App: React.FC = () => {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isLookalikeLoading, setIsLookalikeLoading] = useState<number | null>(null);
+  const [enrichingId, setEnrichingId] = useState<string | null>(null);
+  const [isBatchEnriching, setIsBatchEnriching] = useState(false);
+  const [batchProgress, setBatchProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [loadingMessage, setLoadingMessage] = useState(loadingMessages[0]);
   const [showDocs, setShowDocs] = useState(false);
 
-  // State for Competitor Analysis Modal
   const [isCompetitorModalOpen, setIsCompetitorModalOpen] = useState(false);
   const [competitorToAnalyze, setCompetitorToAnalyze] = useState<{ name: string; context: Lead } | null>(null);
   const [competitorAnalysis, setCompetitorAnalysis] = useState<CompetitorAnalysis | null>(null);
   const [isCompetitorLoading, setIsCompetitorLoading] = useState(false);
   const [competitorError, setCompetitorError] = useState<string | null>(null);
 
-  // State for Score Explanation Modal
   const [isScoreModalOpen, setIsScoreModalOpen] = useState(false);
   const [leadToExplain, setLeadToExplain] = useState<Lead | null>(null);
   const [scoreExplanation, setScoreExplanation] = useState<ScoreExplanation | null>(null);
   const [isScoreExplanationLoading, setIsScoreExplanationLoading] = useState(false);
   const [scoreExplanationError, setScoreExplanationError] = useState<string | null>(null);
 
-  // State for Post-hoc Outreach Generation
-  const [isOutreachLoading, setIsOutreachLoading] = useState(false);
-
   const getFinalCategory = useCallback(() => {
     return category === 'Others' ? otherCategory.trim() : category;
   }, [category, otherCategory]);
-
 
   useEffect(() => {
     try {
         const savedSession = localStorage.getItem(SESSION_STORAGE_KEY);
         if (savedSession) {
-            const { leads: savedLeads, query } = JSON.parse(savedSession) as StoredSession;
-            setLeads(savedLeads);
-            setClientName(query.clientName);
-            
-            const savedCategory = query.category;
-            // Handle backward compatibility for renamed category
-            if (savedCategory === 'Technology') {
-                setCategory('AI & Technology');
-            } else if (CategoryOptions.includes(savedCategory)) {
-                setCategory(savedCategory);
-            } else if (savedCategory) { // Custom category was saved
-                setCategory('Others');
-                setOtherCategory(savedCategory);
-            } else {
-                setCategory('');
+            const parsed = JSON.parse(savedSession) as StoredSession;
+            if (parsed && parsed.leads) setLeads(parsed.leads);
+            if (parsed && parsed.query) {
+                const q = parsed.query;
+                setClientName(q.clientName || '');
+                setCategory(q.category || 'AI & Technology');
+                setDepartments(q.department || ['Marketing', 'CEO']);
+                setRegion(q.region || 'Global');
+                setSearchPlatforms(q.searchPlatforms || ['generalWeb', 'linkedIn', 'reddit']);
+                setExclusionList(q.exclusionList || '');
+                setOutreachTone(q.outreachTone || OutreachToneOptions[0]);
+                setIncludeSimilarCompanies(q.includeSimilarCompanies || false);
             }
-
-            // Handle migration from string department to array
-            const savedDept: any = query.department;
-            if (Array.isArray(savedDept)) {
-                setDepartments(savedDept);
-            } else if (typeof savedDept === 'string' && savedDept) {
-                setDepartments([savedDept]);
-            } else {
-                setDepartments([]);
-            }
-
-            setRegion(query.region);
-            setSearchPlatforms(query.searchPlatforms);
-            setIncludeSimilarCompanies(query.includeSimilarCompanies || false);
-            setGenerateOutreachCadence(query.generateOutreachCadence || false);
-            setOutreachTone(query.outreachTone || OutreachToneOptions[0]);
-            setExclusionList(query.exclusionList || '');
-            setIsAiSaas(query.isAiSaas || false);
         }
     } catch (e) {
-        console.error("Failed to load saved session", e);
         localStorage.removeItem(SESSION_STORAGE_KEY);
     }
   }, []);
@@ -126,11 +104,7 @@ const App: React.FC = () => {
         setLoadingMessage(loadingMessages[i]);
       }, 2000);
     }
-    return () => {
-      if (interval) {
-        clearInterval(interval);
-      }
-    };
+    return () => clearInterval(interval);
   }, [isLoading]);
 
   const saveSession = (currentLeads: Lead[]) => {
@@ -141,36 +115,20 @@ const App: React.FC = () => {
       localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(session));
   }
 
-  const handleClearSession = () => {
-      setLeads([]);
-      setClientName('');
-      setCategory('');
-      setOtherCategory('');
-      setDepartments([]);
-      setRegion('');
-      setSearchPlatforms([]);
-      setIncludeSimilarCompanies(false);
-      setGenerateOutreachCadence(false);
-      setOutreachTone(OutreachToneOptions[0]);
-      setExclusionList('');
-      setIsAiSaas(false);
-      setError(null);
-      localStorage.removeItem(SESSION_STORAGE_KEY);
-  }
-
   const handleGenerateLeads = useCallback(async () => {
+    if (departments.length === 0) {
+        setError("Please select at least one Target Department.");
+        return;
+    }
+    if (searchPlatforms.length === 0) {
+        setError("Please select at least one Search Platform.");
+        return;
+    }
     setIsLoading(true);
     setError(null);
+    setSuccessMessage(null);
     setLeads([]);
-    
     const finalCategory = getFinalCategory();
-
-    if ((!finalCategory && !clientName.trim()) || searchPlatforms.length === 0 || departments.length === 0 || !region) {
-      setError("Please fill all required fields: a client name or category, at least one target department, region, and at least one search platform.");
-      setIsLoading(false);
-      return;
-    }
-
     try {
       const generated = await generateLeads(finalCategory, departments, searchPlatforms, clientName, region, includeSimilarCompanies, generateOutreachCadence, exclusionList, outreachTone, isAiSaas);
       setLeads(generated);
@@ -182,350 +140,272 @@ const App: React.FC = () => {
     }
   }, [getFinalCategory, departments, searchPlatforms, clientName, region, includeSimilarCompanies, generateOutreachCadence, exclusionList, outreachTone, isAiSaas]);
 
-  const handleFindLookalikes = useCallback(async (seedLead: Lead, index: number) => {
-    setIsLookalikeLoading(index);
+  const handleEnrichLead = async (lead: Lead) => {
+    setEnrichingId(lead.companyName);
     setError(null);
     try {
-        const lookalikes = await findLookalikeLeads(seedLead, region, departments, exclusionList);
-        const updatedLeads = [...leads, ...lookalikes];
-        setLeads(updatedLeads);
-        saveSession(updatedLeads);
+        const enrichment = await enrichLead(lead, outreachTone);
+        setLeads(prevLeads => {
+            const updated = prevLeads.map(l => l.companyName === lead.companyName ? { ...l, ...enrichment } : l);
+            saveSession(updated);
+            return [...updated]; // Spread to ensure React detects change
+        });
+        setSuccessMessage(`Intel Verified for ${lead.companyName}!`);
+        setTimeout(() => setSuccessMessage(null), 4000);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An unknown error occurred while finding similar leads.');
+        console.error(err);
+        setError(`Research failed for ${lead.companyName}.`);
+    } finally {
+        setEnrichingId(null);
+    }
+  };
+
+  const handleBatchEnrich = async (targetCompanyNames?: string[]) => {
+    setIsBatchEnriching(true);
+    setBatchProgress(0);
+    setError(null);
+    setSuccessMessage(null);
+    
+    const leadsToProcess = targetCompanyNames 
+        ? leads.filter(l => targetCompanyNames.includes(l.companyName))
+        : leads.filter(l => !l.swotAnalysis);
+
+    if (leadsToProcess.length === 0) {
+        setIsBatchEnriching(false);
+        return;
+    }
+
+    let completed = 0;
+    let failedCount = 0;
+
+    for (const lead of leadsToProcess) {
+        setEnrichingId(lead.companyName);
+        try {
+            const enrichment = await enrichLead(lead, outreachTone);
+            setLeads(prevLeads => {
+                const updated = prevLeads.map(l => l.companyName === lead.companyName ? { ...l, ...enrichment } : l);
+                saveSession(updated);
+                return [...updated];
+            });
+        } catch (err) {
+            console.error(`Failed to research ${lead.companyName}`, err);
+            failedCount++;
+        }
+        completed++;
+        setBatchProgress(Math.round((completed / leadsToProcess.length) * 100));
+    }
+    
+    setEnrichingId(null);
+    setIsBatchEnriching(false);
+    
+    if (failedCount < leadsToProcess.length) {
+        setSuccessMessage(`Research sequence complete! ${leadsToProcess.length - failedCount} leads verified.`);
+        setTimeout(() => setSuccessMessage(null), 5000);
+    } else {
+        setError("Intel research sequence failed.");
+    }
+  };
+
+  const handleFindLookalikes = async (seedLead: Lead, index: number) => {
+    setIsLookalikeLoading(index);
+    try {
+        const lookalikes = await findLookalikeLeads(seedLead, region, departments, exclusionList);
+        setLeads(prev => {
+            const updated = [...prev, ...lookalikes];
+            saveSession(updated);
+            return updated;
+        });
+    } catch (err) {
+      setError("Lookalike discovery failed.");
     } finally {
         setIsLookalikeLoading(null);
     }
-  }, [leads, region, departments, exclusionList]);
-
-  const handleGenerateOutreach = useCallback(async () => {
-      setIsOutreachLoading(true);
-      setError(null);
-      try {
-          const updatedLeads = await Promise.all(leads.map(async (lead) => {
-              const cadence = await generateOutreachForLead(lead, outreachTone);
-              return { ...lead, outreachCadence: cadence };
-          }));
-
-          setLeads(updatedLeads);
-          saveSession(updatedLeads);
-      } catch (err) {
-          setError(err instanceof Error ? err.message : 'An unknown error occurred while generating outreach.');
-      } finally {
-          setIsOutreachLoading(false);
-      }
-  }, [leads, outreachTone]);
+  };
 
   const handleAnalyzeCompetitor = useCallback(async (competitorName: string, leadContext: Lead) => {
     setCompetitorToAnalyze({ name: competitorName, context: leadContext });
     setIsCompetitorModalOpen(true);
     setIsCompetitorLoading(true);
-    setCompetitorError(null);
     setCompetitorAnalysis(null);
     try {
       const analysis = await analyzeCompetitor(competitorName, leadContext, region);
       setCompetitorAnalysis(analysis);
     } catch (err) {
-      setCompetitorError(err instanceof Error ? err.message : 'An unknown error occurred.');
+      setCompetitorError("Market analysis failed.");
     } finally {
       setIsCompetitorLoading(false);
     }
   }, [region]);
 
-  const closeCompetitorModal = () => {
-    setIsCompetitorModalOpen(false);
-    setCompetitorToAnalyze(null);
-    setCompetitorAnalysis(null);
-    setCompetitorError(null);
-  };
-
   const handleExplainScore = useCallback(async (lead: Lead) => {
     setLeadToExplain(lead);
     setIsScoreModalOpen(true);
     setIsScoreExplanationLoading(true);
-    setScoreExplanationError(null);
-    setScoreExplanation(null);
     try {
         const explanation = await explainLeadScore(lead);
         setScoreExplanation(explanation);
     } catch (err) {
-        setScoreExplanationError(err instanceof Error ? err.message : 'An unknown error occurred.');
+        setScoreExplanationError("Logic breakdown failed.");
     } finally {
         setIsScoreExplanationLoading(false);
     }
   }, []);
 
-  const closeScoreModal = () => {
-    setIsScoreModalOpen(false);
-    setLeadToExplain(null);
-    setScoreExplanation(null);
-    setScoreExplanationError(null);
-  };
-
-  const isFormInvalid = (!getFinalCategory() && !clientName.trim()) || departments.length === 0 || !region || searchPlatforms.length === 0;
-
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-200 flex flex-col items-center p-4 sm:p-6 lg:p-8">
+    <div className="min-h-screen bg-slate-900 text-slate-200 flex flex-col items-center p-4 sm:p-6 lg:p-8 relative overflow-x-hidden">
+      {/* Notifications */}
+      <div className="fixed top-5 right-5 z-[100] flex flex-col gap-3 pointer-events-none">
+          {successMessage && (
+            <div className="pointer-events-auto bg-emerald-600 text-white px-6 py-4 rounded-2xl shadow-3xl flex items-center gap-4 animate-in slide-in-from-right duration-500 border border-emerald-500/50 backdrop-blur-md">
+                <div className="bg-white/20 p-1.5 rounded-full"><CheckIcon className="w-5 h-5" /></div>
+                <span className="font-black text-xs uppercase tracking-widest">{successMessage}</span>
+            </div>
+          )}
+          {error && (
+            <div className="pointer-events-auto bg-red-600 text-white px-6 py-4 rounded-2xl shadow-3xl flex items-center gap-4 animate-in slide-in-from-right duration-500 border border-red-500/50 backdrop-blur-md">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
+                </svg>
+                <span className="font-black text-xs uppercase tracking-widest">{error}</span>
+            </div>
+          )}
+      </div>
+
       {showDocs && <Documentation onClose={() => setShowDocs(false)} />}
+      
       {isCompetitorModalOpen && (
         <CompetitorAnalysisModal
           competitorName={competitorToAnalyze?.name || ''}
           isLoading={isCompetitorLoading}
           analysis={competitorAnalysis}
           error={competitorError}
-          onClose={closeCompetitorModal}
+          onClose={() => setIsCompetitorModalOpen(false)}
         />
       )}
+      
        {isScoreModalOpen && (
         <ScoreExplanationModal
           lead={leadToExplain}
           isLoading={isScoreExplanationLoading}
           explanation={scoreExplanation}
           error={scoreExplanationError}
-          onClose={closeScoreModal}
+          onClose={() => setIsScoreModalOpen(false)}
         />
       )}
+      
       <div className="w-full max-w-7xl mx-auto">
-        <header className="text-center mb-10 relative">
-          <h1 className="text-4xl sm:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-cyan-400 mb-2">
-            Abhishek's Inbound: AI Lead Gen Assistant
+        <header className="text-center mb-16 relative py-10">
+          <div className="inline-block px-4 py-1.5 bg-purple-900/30 border border-purple-500/30 rounded-full text-[10px] font-black text-purple-400 uppercase tracking-[0.3em] mb-4">
+            ZEE Revenue Intelligence v2.5
+          </div>
+          <h1 className="text-5xl sm:text-7xl font-black text-white mb-4 tracking-tighter">
+            Abhishek's <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-cyan-400 to-indigo-400">Inbound</span>
           </h1>
-          <p className="text-lg text-slate-400">
-            Discover untapped international clients showing intent to enter the Indian market.
-          </p>
-          <button 
-            onClick={() => setShowDocs(true)} 
-            className="absolute top-0 right-0 flex items-center gap-2 text-slate-400 hover:text-cyan-400 transition-colors text-sm font-semibold"
-            title="Open Documentation"
-          >
-            <BookOpenIcon className="w-5 h-5" />
-            <span>Docs</span>
+          <p className="text-lg text-slate-500 font-bold tracking-tight">Enterprise Lead Intelligence & Sequence Orchestration.</p>
+          <button onClick={() => setShowDocs(true)} className="absolute top-10 right-0 flex items-center gap-2 text-slate-500 hover:text-cyan-400 transition-all text-[11px] font-black uppercase tracking-widest group">
+            <BookOpenIcon className="w-5 h-5 group-hover:-rotate-6 transition-transform" /> <span>System Docs</span>
           </button>
         </header>
 
-        <main className="bg-slate-800/50 backdrop-blur-sm p-6 sm:p-8 rounded-2xl shadow-2xl border border-slate-700">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-            <div>
-              <label htmlFor="clientName" className="block text-sm font-semibold mb-2 text-slate-300">
-                Client Name <span className="text-slate-400">(Optional)</span>
-              </label>
-              <input
-                id="clientName"
-                type="text"
-                value={clientName}
-                onChange={(e) => setClientName(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-300 placeholder-slate-500"
-                placeholder="e.g., Derila"
-              />
-              {clientName.trim() && (
-                <div className="mt-3 flex items-center">
-                  <input
-                    id="includeSimilar"
-                    type="checkbox"
-                    checked={includeSimilarCompanies}
-                    onChange={(e) => setIncludeSimilarCompanies(e.target.checked)}
-                    className="w-4 h-4 text-purple-600 bg-slate-700 border-slate-500 rounded focus:ring-purple-500 focus:ring-2"
+        <main className="bg-slate-800/30 backdrop-blur-2xl p-8 sm:p-12 rounded-[3rem] shadow-4xl border border-slate-700/50">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-12 mb-10">
+            <div className="space-y-8">
+              <div className="group">
+                <label className="block text-[11px] font-black uppercase tracking-widest mb-3 text-slate-500 group-hover:text-purple-400 transition-colors">Target Seed Company (Optional)</label>
+                <input type="text" value={clientName} onChange={(e) => setClientName(e.target.value)} className="w-full bg-slate-900/50 border border-slate-700/60 rounded-2xl p-4 text-white focus:border-purple-500 transition-all shadow-inner font-bold placeholder:text-slate-700" placeholder="e.g., Derila or RunwayML" />
+                <div className="mt-4 flex items-center gap-4 bg-slate-900/40 p-3 rounded-xl border border-slate-800">
+                  <input 
+                    type="checkbox" 
+                    id="similarCompanies" 
+                    className="w-5 h-5 rounded-lg border-slate-700 bg-slate-900 text-purple-600 focus:ring-purple-500 cursor-pointer transition-all" 
+                    checked={includeSimilarCompanies} 
+                    onChange={(e) => setIncludeSimilarCompanies(e.target.checked)} 
                   />
-                  <label htmlFor="includeSimilar" className="ml-2 text-sm font-medium text-slate-300">
-                    Also find similar companies
+                  <label htmlFor="similarCompanies" className="text-xs font-bold text-slate-400 cursor-pointer hover:text-slate-200 transition-colors uppercase tracking-tight">
+                    Search for domain competitors & lookalikes
                   </label>
                 </div>
-              )}
+              </div>
+              
+              <div className="group">
+                <label className="block text-[11px] font-black uppercase tracking-widest mb-3 text-slate-500 group-hover:text-cyan-400 transition-colors">Negative Search List</label>
+                <input 
+                  type="text" 
+                  value={exclusionList} 
+                  onChange={(e) => setExclusionList(e.target.value)} 
+                  className="w-full bg-slate-900/50 border border-slate-700/60 rounded-2xl p-4 text-white focus:border-cyan-500 transition-all shadow-inner font-bold placeholder:text-slate-700" 
+                  placeholder="e.g., Google, Amazon, ZEE (Exclude current clients)" 
+                />
+              </div>
             </div>
-            <div>
-              <label htmlFor="category" className="block text-sm font-semibold mb-2 text-slate-300">
-                Client Category
-              </label>
-              <select
-                id="category"
-                value={category}
-                onChange={(e) => {
-                    setCategory(e.target.value);
-                    if (e.target.value !== 'AI & Technology') {
-                        setIsAiSaas(false);
-                    }
-                }}
-                className={`w-full bg-slate-900 border border-slate-600 rounded-lg p-3 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-300 ${!category ? 'text-slate-400' : ''}`}
-              >
-                <option value="" disabled>Select the Category</option>
-                {CategoryOptions.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
-              {category === 'AI & Technology' && (
-                  <div className="mt-3 flex items-center animate-fadeIn">
-                    <input
-                        id="isAiSaas"
-                        type="checkbox"
-                        checked={isAiSaas}
-                        onChange={(e) => setIsAiSaas(e.target.checked)}
-                        className="w-4 h-4 text-purple-600 bg-slate-700 border-slate-500 rounded focus:ring-purple-500 focus:ring-2 cursor-pointer"
-                    />
-                    <label htmlFor="isAiSaas" className="ml-2 text-sm font-medium text-slate-300 cursor-pointer select-none">
-                        AI- SAAS Companies
-                    </label>
-                  </div>
-              )}
-              {category === 'Others' && (
-                <div className="mt-3">
-                  <label htmlFor="otherCategory" className="block text-xs font-semibold mb-1 text-slate-400">
-                      Please specify category
-                  </label>
-                  <input
-                      id="otherCategory"
-                      type="text"
-                      value={otherCategory}
-                      onChange={(e) => setOtherCategory(e.target.value)}
-                      className="w-full bg-slate-700 border border-slate-600 rounded-lg p-2 text-sm focus:ring-1 focus:ring-purple-500 focus:border-purple-500 transition-all duration-300 placeholder-slate-500"
-                      placeholder="e.g., Sustainable Fashion"
-                      required
-                  />
-                </div>
-              )}
+
+            <div className="space-y-8">
+              <div className="group">
+                <label className="block text-[11px] font-black uppercase tracking-widest mb-3 text-slate-500 group-hover:text-indigo-400 transition-colors">Market Category</label>
+                <select value={category} onChange={(e) => setCategory(e.target.value)} className="w-full bg-slate-900/50 border border-slate-700/60 rounded-2xl p-4 text-white focus:border-indigo-500 transition-all font-bold cursor-pointer">
+                  {CategoryOptions.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+                {category === 'Others' && (
+                  <input type="text" value={otherCategory} onChange={(e) => setOtherCategory(e.target.value)} className="w-full mt-4 bg-slate-900/50 border border-slate-700 rounded-2xl p-4 text-white focus:border-indigo-500 font-bold" placeholder="Define custom industry niche..." />
+                )}
+              </div>
+              
+              <div className="group">
+                <label className="block text-[11px] font-black uppercase tracking-widest mb-3 text-slate-500 group-hover:text-emerald-400 transition-colors">HQ Region</label>
+                <select value={region} onChange={(e) => setRegion(e.target.value)} className="w-full bg-slate-900/50 border border-slate-700/60 rounded-2xl p-4 text-white focus:border-emerald-500 transition-all font-bold cursor-pointer">
+                    {RegionOptions.map(r => <option key={r} value={r}>{r}</option>)}
+                </select>
+              </div>
             </div>
           </div>
 
-          <div className="mb-6">
-            <label className="block text-sm font-semibold mb-3 text-slate-300">
-              Target Departments <span className="text-slate-400 text-xs ml-1">(Select multiple)</span>
-            </label>
-            <div className="flex flex-wrap gap-3 p-4 bg-slate-900/50 border border-slate-600 rounded-lg">
+          <div className="mb-10 bg-slate-900/40 p-8 rounded-[2rem] border border-slate-700/50 shadow-inner">
+            <label className="block text-[11px] font-black uppercase tracking-[0.2em] mb-6 text-slate-500 text-center">Target Departments (Multi-Select)</label>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4">
               {DepartmentOptions.map(dept => (
-                <div key={dept} className="flex items-center">
-                  <input
-                    id={`dept-${dept}`}
-                    type="checkbox"
-                    checked={departments.includes(dept)}
-                    onChange={(e) => {
-                        if (e.target.checked) {
-                            setDepartments([...departments, dept]);
-                        } else {
-                            setDepartments(departments.filter(d => d !== dept));
-                        }
-                    }}
-                    className="w-4 h-4 text-purple-600 bg-slate-700 border-slate-500 rounded focus:ring-purple-500 focus:ring-2 cursor-pointer"
-                  />
-                  <label htmlFor={`dept-${dept}`} className="ml-2 text-sm font-medium text-slate-300 cursor-pointer select-none">
-                    {dept}
-                  </label>
-                </div>
+                <label key={dept} className={`flex items-center justify-center gap-2 p-3.5 rounded-2xl border text-[10px] font-black cursor-pointer transition-all uppercase tracking-tight ${departments.includes(dept) ? 'bg-purple-600/20 border-purple-500 text-purple-200 shadow-lg shadow-purple-900/20 scale-105' : 'bg-slate-800 border-slate-700 text-slate-500 hover:border-slate-500 hover:text-slate-300'}`}>
+                  <input type="checkbox" className="hidden" checked={departments.includes(dept)} onChange={() => setDepartments(prev => prev.includes(dept) ? prev.filter(d => d !== dept) : [...prev, dept])} />
+                  {dept}
+                </label>
               ))}
             </div>
           </div>
 
-          <div className="mb-6">
-              <label htmlFor="exclusionList" className="block text-sm font-semibold mb-2 text-slate-300">
-                Exclude Companies <span className="text-slate-400">(Optional, comma-separated)</span>
-              </label>
-              <textarea
-                id="exclusionList"
-                value={exclusionList}
-                onChange={(e) => setExclusionList(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-600 rounded-lg p-3 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-300 placeholder-slate-500"
-                placeholder="e.g., Competitor A, Old Prospect Inc, Known Partner LLC"
-                rows={2}
-              />
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-sm font-semibold mb-3 text-slate-300">
-                Search Platforms & Options
-              </label>
-              <div className="flex flex-wrap gap-x-4 gap-y-2 items-start">
-                {SearchPlatformOptions.map(platform => (
-                  <div key={platform.id} className="flex items-center">
-                    <input
-                      id={`platform-${platform.id}`}
-                      type="checkbox"
-                      checked={searchPlatforms.includes(platform.id)}
-                      onChange={(e) => setSearchPlatforms(prev => prev.includes(platform.id) ? prev.filter(p => p !== platform.id) : [...prev, platform.id])}
-                      className="w-4 h-4 text-purple-600 bg-slate-700 border-slate-500 rounded focus:ring-purple-500 focus:ring-2 cursor-pointer"
-                    />
-                    <label htmlFor={`platform-${platform.id}`} className="ml-2 text-sm font-medium text-slate-300 cursor-pointer">
-                      {platform.name}
-                    </label>
-                  </div>
-                ))}
-                <div>
-                  <div className="flex items-center">
-                      <input
-                        id="generateOutreachCadence"
-                        type="checkbox"
-                        checked={generateOutreachCadence}
-                        onChange={(e) => setGenerateOutreachCadence(e.target.checked)}
-                        className="w-4 h-4 text-purple-600 bg-slate-700 border-slate-500 rounded focus:ring-purple-500 focus:ring-2 cursor-pointer"
-                      />
-                      <label htmlFor="generateOutreachCadence" className="ml-2 text-sm font-medium text-slate-300 cursor-pointer">
-                        Generate Outreach Cadence
+          <div className="mb-10 bg-slate-900/40 p-8 rounded-[2rem] border border-slate-700/50 shadow-inner">
+             <div className="w-full">
+                <label className="block text-[11px] font-black uppercase tracking-[0.2em] mb-6 text-slate-500 text-center">Search Nodes & Social Intelligence</label>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-4">
+                  {SearchPlatformOptions.map(p => (
+                      <label key={p.id} className={`flex items-center gap-3 px-4 py-3 rounded-2xl border text-[10px] font-black cursor-pointer transition-all uppercase tracking-tight ${searchPlatforms.includes(p.id) ? 'bg-cyan-600/10 border-cyan-500 text-cyan-200 shadow-lg shadow-cyan-900/20' : 'bg-slate-800/50 border-slate-700 text-slate-500 hover:border-slate-600 hover:text-slate-300'}`}>
+                          <input type="checkbox" className="hidden" checked={searchPlatforms.includes(p.id)} onChange={() => setSearchPlatforms(prev => prev.includes(p.id) ? prev.filter(x => x !== p.id) : [...prev, p.id])} />
+                          <span className="truncate">{p.name}</span>
                       </label>
-                  </div>
-                  {generateOutreachCadence && (
-                      <div className="mt-2 pl-6">
-                          <label htmlFor="outreachTone" className="block text-xs font-semibold mb-1 text-slate-400">
-                              Cadence Tone
-                          </label>
-                          <select
-                              id="outreachTone"
-                              value={outreachTone}
-                              onChange={(e) => setOutreachTone(e.target.value)}
-                              className="w-full bg-slate-700 border border-slate-600 rounded-md p-1.5 text-xs focus:ring-1 focus:ring-purple-500 focus:border-purple-500 transition-all duration-300"
-                          >
-                              {OutreachToneOptions.map(t => <option key={t} value={t}>{t}</option>)}
-                          </select>
-                      </div>
-                  )}
+                  ))}
                 </div>
-              </div>
-            </div>
-            <div>
-              <label htmlFor="region" className="block text-sm font-semibold mb-2 text-slate-300">
-                Target Region
-              </label>
-              <select
-                id="region"
-                value={region}
-                onChange={(e) => setRegion(e.target.value)}
-                className={`w-full bg-slate-900 border border-slate-600 rounded-lg p-3 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-all duration-300 ${!region ? 'text-slate-400' : ''}`}
-              >
-                <option value="" disabled>Select the Region</option>
-                {RegionOptions.map(r => <option key={r} value={r}>{r}</option>)}
-              </select>
-            </div>
+             </div>
           </div>
 
-
-          <div className="mt-8 flex justify-center items-center gap-4">
-            <button
-              onClick={handleClearSession}
-              className="px-6 py-3 bg-slate-600 hover:bg-slate-700 text-white font-bold rounded-lg shadow-lg transform hover:scale-105 transition-all duration-300"
-            >
-                Clear
-            </button>
-            <button
-              onClick={handleGenerateLeads}
-              disabled={isLoading || isLookalikeLoading !== null || isFormInvalid}
-              className="inline-flex items-center justify-center gap-2 px-8 py-3 bg-purple-600 hover:bg-purple-700 text-white font-bold rounded-lg shadow-lg transform hover:scale-105 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:scale-100"
+          <div className="flex justify-center mt-12">
+            <button 
+                onClick={handleGenerateLeads} 
+                disabled={isLoading || !region || departments.length === 0 || searchPlatforms.length === 0} 
+                className={`px-14 py-5 font-black rounded-2xl shadow-3xl flex items-center gap-4 transition-all transform hover:scale-105 active:scale-95 uppercase tracking-[0.15em] text-xs ${isLoading ? 'bg-slate-700 text-slate-400 cursor-not-allowed' : 'bg-gradient-to-r from-purple-600 via-indigo-600 to-indigo-700 hover:from-purple-500 hover:to-indigo-500 text-white shadow-purple-900/50'}`}
             >
               {isLoading ? (
                 <>
-                  <div className="w-5 h-5 border-2 border-t-transparent border-white rounded-full animate-spin"></div>
+                  <div className="w-5 h-5 border-4 border-t-transparent border-white rounded-full animate-spin"></div>
                   <span>{loadingMessage}</span>
                 </>
               ) : (
                 <>
                   <SparklesIcon className="w-5 h-5" />
-                  <span>Generate Leads</span>
+                  <span>Start Discovery Session</span>
                 </>
               )}
             </button>
           </div>
         </main>
         
-        {error && (
-          <div className="mt-8 bg-red-900/50 border border-red-700 text-red-300 px-4 py-3 rounded-lg text-center" role="alert">
-            <strong className="font-bold">Error: </strong>
-            <span className="block sm:inline">{error}</span>
-          </div>
-        )}
-
         {leads.length > 0 && (
           <LeadResultsTable 
             leads={leads} 
@@ -534,18 +414,13 @@ const App: React.FC = () => {
             isLookalikeLoading={isLookalikeLoading}
             onAnalyzeCompetitor={handleAnalyzeCompetitor}
             onExplainScore={handleExplainScore}
-            onGenerateOutreach={handleGenerateOutreach}
-            isOutreachLoading={isOutreachLoading}
+            onEnrichLead={handleEnrichLead}
+            enrichingId={enrichingId}
+            isBatchEnriching={isBatchEnriching}
+            batchProgress={batchProgress}
+            onBatchEnrich={handleBatchEnrich}
           />
         )}
-
-        {!isLoading && leads.length === 0 && !error && (
-            <div className="text-center mt-12 text-slate-500">
-                <p>Your generated leads will appear here.</p>
-                <p className="text-xs mt-2">Any previous session will be loaded automatically.</p>
-            </div>
-        )}
-
       </div>
     </div>
   );

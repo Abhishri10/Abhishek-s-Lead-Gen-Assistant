@@ -28,12 +28,6 @@ export interface OutreachStep {
     body: string;
 }
 
-export interface CompetitorAnalysis {
-    analysis: string;
-    marketShare: string;
-    recentNews: NewsArticle;
-}
-
 export interface PainPoint {
     painPoint: string;
     suggestedSolution: string;
@@ -49,18 +43,15 @@ export interface Lead {
   phone: string;
   contacts: Contact[];
   leadScore: number;
-  outreachSuggestion: string;
-  employeeCount: string;
-  latestFunding: string;
-  techStack: string[];
-  competitors: string[];
-  swotAnalysis: SWOT;
+  outreachSuggestion: string; // Used as "Ice Breaker"
+  employeeCount?: string;
+  latestFunding?: string;
+  techStack?: string[];
+  competitors?: string[];
+  swotAnalysis?: SWOT;
   painPointAnalysis?: PainPoint[];
-  instagramProfileUrl?: string;
   latestNews?: NewsArticle;
-  latestIndiaNews?: NewsArticle;
   outreachCadence?: OutreachStep[];
-  latestInstagramPosts?: InstagramPost[];
 }
 
 export interface SearchQuery {
@@ -76,12 +67,20 @@ export interface SearchQuery {
     isAiSaas?: boolean;
 }
 
-export interface StoredSession {
-    leads: Lead[];
-    query: SearchQuery;
-}
-
 export interface ScoreExplanation {
     explanation: string;
     bulletPoints: string[];
+}
+
+// Added CompetitorAnalysis interface to support detailed competitor research features
+export interface CompetitorAnalysis {
+  analysis: string;
+  marketShare: string;
+  recentNews: NewsArticle;
+}
+
+// Added StoredSession interface to support state persistence in local storage
+export interface StoredSession {
+  leads: Lead[];
+  query: SearchQuery;
 }
