@@ -295,13 +295,20 @@ const App: React.FC = () => {
       
       <div className="w-full max-w-7xl mx-auto">
         <header className="text-center mb-16 relative py-10">
-          <div className="inline-block px-4 py-1.5 bg-purple-900/30 border border-purple-500/30 rounded-full text-[10px] font-black text-purple-400 uppercase tracking-[0.3em] mb-4">
-            ZEE Revenue Intelligence v2.5
+          <div className="flex flex-col items-center gap-2 mb-6">
+            <div className="px-4 py-1.5 bg-purple-900/30 border border-purple-500/30 rounded-full text-[10px] font-black text-purple-400 uppercase tracking-[0.3em]">
+                Abhishek's Inbound Edition
+            </div>
+            <div className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em]">
+                ZEE Revenue Intelligence v2.5
+            </div>
           </div>
-          <h1 className="text-5xl sm:text-7xl font-black text-white mb-4 tracking-tighter">
-            Abhishek's <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-cyan-400 to-indigo-400">Inbound</span>
+          <h1 className="text-5xl sm:text-8xl font-black text-white mb-6 tracking-tighter leading-none">
+            Revenue <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-cyan-400 to-indigo-400 drop-shadow-2xl">Intelligence Powerhouse</span>
           </h1>
-          <p className="text-lg text-slate-500 font-bold tracking-tight">Enterprise Lead Intelligence & Sequence Orchestration.</p>
+          <p className="text-xl text-slate-500 font-bold tracking-tight max-w-3xl mx-auto leading-relaxed">
+            Enterprise-grade lead research & strategic sequence orchestration for global market expansion.
+          </p>
           <button onClick={() => setShowDocs(true)} className="absolute top-10 right-0 flex items-center gap-2 text-slate-500 hover:text-cyan-400 transition-all text-[11px] font-black uppercase tracking-widest group">
             <BookOpenIcon className="w-5 h-5 group-hover:-rotate-6 transition-transform" /> <span>System Docs</span>
           </button>
