@@ -304,7 +304,7 @@ const App: React.FC = () => {
             </div>
           </div>
           <h1 className="text-5xl sm:text-8xl font-black text-white mb-6 tracking-tighter leading-none">
-            Revenue <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-cyan-400 to-indigo-400 drop-shadow-2xl">Intelligence Powerhouse</span>
+            Inbound- <span className="text-transparent bg-clip-text bg-gradient-to-r from-purple-400 via-cyan-400 to-indigo-400 drop-shadow-2xl">Revenue Intelligence Powerhouse</span>
           </h1>
           <p className="text-xl text-slate-500 font-bold tracking-tight max-w-3xl mx-auto leading-relaxed">
             Enterprise-grade lead research & strategic sequence orchestration for global market expansion.

@@ -5,11 +5,11 @@ import { DownloadIcon, DocumentIcon } from './Icons';
 declare var jspdf: any;
 
 const documentationContent = `
-# Abhishek's Inbound: AI Lead Gen Assistant: System Documentation & Prompt Guide
+# Inbound- Revenue Intelligence Powerhouse: System Documentation & Prompt Guide
 
 ## 1. Introduction
 
-Abhishek's Inbound: AI Lead Gen Assistant is an intelligent tool designed to automate and enhance the process of finding international companies that show a strong potential and intent to expand into the Indian market. By leveraging the power of Google's Gemini AI and Google Search, it performs deep-dive analysis on companies, identifies key decision-makers, scores lead quality, and even composes personalized outreach emails, transforming raw data into actionable sales intelligence.
+Inbound- Revenue Intelligence Powerhouse is an intelligent tool designed to automate and enhance the process of finding international companies that show a strong potential and intent to expand into the Indian market. By leveraging the power of Google's Gemini AI and Google Search, it performs deep-dive analysis on companies, identifies key decision-makers, scores lead quality, and even composes personalized outreach emails, transforming raw data into actionable sales intelligence.
 
 ## 2. Core Features & Functionality
 
@@ -50,11 +50,11 @@ Abhishek's Inbound: AI Lead Gen Assistant is an intelligent tool designed to aut
 `;
 
 const appOverviewDocContent = `
-Abhishek's Inbound: AI Lead Gen Assistant is a next-generation sales intelligence platform designed to bridge the gap between global innovations and the Indian market. Built on a modern tech stack comprising React 19, Tailwind CSS, and powered by the cutting-edge Google Gemini 2.5-Flash model, the app functions as a sophisticated data scraper and researcher.
+Inbound- Revenue Intelligence Powerhouse is a next-generation sales intelligence platform designed to bridge the gap between global innovations and the Indian market. Built on a modern tech stack comprising React 19, Tailwind CSS, and powered by the cutting-edge Google Gemini 3 model, the app functions as a sophisticated data scraper and researcher.
 
 The platform specializes in identifying high-intent international leads—particularly in the 'AI & Technology' sector—by scanning LinkedIn, Social Media (Reddit, X, Instagram), and global news networks. It detects subtle expansion signals, such as hiring for India-specific roles or community adoption of tools like Kling AI and RunwayML.
 
-Our Unique Selling Proposition (USP) lies in the depth of our automated research. Unlike traditional lead lists, this tool provides full SWOT analyses, verified decision-maker contacts across multiple departments, and pain-point mappings. Furthermore, it automates the creation of personalized outreach cadences that subtly weave in the ZEE value proposition, highlighting assets like ZEE5 and its massive news network spanning 50+ channels. With features like lead scoring and lookalike discovery, Abhishek's Inbound empowers sales teams to move beyond cold calling into high-impact, data-driven storytelling and targeted performance funnels.
+Our Unique Selling Proposition (USP) lies in the depth of our automated research. Unlike traditional lead lists, this tool provides full SWOT analyses, verified decision-maker contacts across multiple departments, and pain-point mappings. Furthermore, it automates the creation of personalized outreach cadences that subtly weave in the ZEE value proposition, highlighting assets like ZEE5 and its massive news network spanning 50+ channels. With features like lead scoring and lookalike discovery, Inbound empowers sales teams to move beyond cold calling into high-impact, data-driven storytelling and targeted performance funnels.
 `;
 
 interface DocumentationProps {
@@ -98,20 +98,20 @@ const Documentation: React.FC<DocumentationProps> = ({ onClose }) => {
         }
         if (line.trim().startsWith('```')) { inCodeBlock = !inCodeBlock; cursorY += 2; continue; }
         if (inCodeBlock) { addText(line.replace(/^ /g, ''), { isCode: true, size: 8 }); }
-        else if (line.startsWith("# Abhishek's Inbound")) { addText(line.substring(2), { size: 18, style: 'bold' }); cursorY += 2; }
+        else if (line.startsWith("# Inbound- Revenue Intelligence Powerhouse")) { addText(line.substring(2), { size: 18, style: 'bold' }); cursorY += 2; }
         else if (line.startsWith('## ')) { cursorY += 6; addText(line.substring(3), { size: 14, style: 'bold' }); cursorY += 2; }
         else if (line.startsWith('### ')) { cursorY += 4; addText(line.substring(4), { size: 12, style: 'bold' }); cursorY += 1; }
         else if (line.startsWith('-   ')) { addText(`• ${line.substring(4)}`, { indent: 5 }); }
         else if (line.trim() === '') { cursorY += 4; }
         else { addText(line, {}); }
     }
-    doc.save('Abhisheks_Inbound_Documentation.pdf');
+    doc.save('Inbound_Revenue_Intelligence_Powerhouse_Documentation.pdf');
   };
 
   const handleDownloadDoc = () => {
     const header = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
     <head><meta charset='utf-8'><title>App Overview</title></head><body>
-    <h1 style="text-align: center; color: #4F46E5;">Abhishek's Inbound: AI Lead Gen Assistant - Overview</h1>
+    <h1 style="text-align: center; color: #4F46E5;">Inbound- Revenue Intelligence Powerhouse - Overview</h1>
     <p style="font-family: Arial, sans-serif; line-height: 1.6;">${appOverviewDocContent.replace(/\n/g, '<br>')}</p>
     </body></html>`;
     
@@ -121,7 +121,7 @@ const Documentation: React.FC<DocumentationProps> = ({ onClose }) => {
     
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = 'App_Overview_Abhisheks_Inbound.doc';
+    link.download = 'App_Overview_Inbound_Revenue_Intelligence_Powerhouse.doc';
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
