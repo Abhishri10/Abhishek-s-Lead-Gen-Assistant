@@ -19,7 +19,19 @@ const SearchPlatformOptions = [
 ];
 
 const RegionOptions = ['Global', 'APAC', 'UK/Europe', 'USA', 'Canada', 'MENA', 'Africa'];
-const DepartmentOptions = ['Marketing', 'International Marketing', 'Sales', 'CEO', 'Business Head', 'COO'];
+const DepartmentOptions = [
+  'Marketing', 
+  'Marketing & Communications', 
+  'Global Communications', 
+  'International Marketing', 
+  'Global Marketing', 
+  'PR & Marketing',
+  'Global PR',
+  'Global PR & Marketing',
+  'CEO', 
+  'Business Head', 
+  'COO'
+];
 const CategoryOptions = ['Airlines', 'Food', 'Beverages', 'Retail', 'AI & Technology', 'Travel & Tourism', 'Gaming & Betting', 'Education', 'Others'];
 const OutreachToneOptions = ['Default (Professional)', 'Formal', 'Casual & Friendly', 'Direct & Concise'];
 
@@ -28,8 +40,8 @@ const SESSION_STORAGE_KEY = 'leadGenSession';
 const loadingMessages = [
   "Scraping current 2025 expansion signals...",
   "Cross-referencing LinkedIn recency...",
-  "Identifying decision makers...",
-  "Filtering for high-intent signals...",
+  "Identifying decision makers in Communications...",
+  "Targeting Global Marketing heads...",
   "Building discovery list..."
 ];
 
@@ -37,7 +49,7 @@ const App: React.FC = () => {
   const [clientName, setClientName] = useState('');
   const [category, setCategory] = useState('AI & Technology');
   const [otherCategory, setOtherCategory] = useState('');
-  const [departments, setDepartments] = useState<string[]>(['Marketing', 'CEO']);
+  const [departments, setDepartments] = useState<string[]>(['Marketing', 'Marketing & Communications', 'Global Communications', 'Global PR & Marketing']);
   const [region, setRegion] = useState('Global');
   const [searchPlatforms, setSearchPlatforms] = useState<string[]>(['generalWeb', 'linkedIn', 'reddit']);
   const [includeSimilarCompanies, setIncludeSimilarCompanies] = useState(false);
@@ -82,7 +94,7 @@ const App: React.FC = () => {
                 const q = parsed.query;
                 setClientName(q.clientName || '');
                 setCategory(q.category || 'AI & Technology');
-                setDepartments(q.department || ['Marketing', 'CEO']);
+                setDepartments(q.department || ['Marketing', 'Marketing & Communications', 'Global Communications', 'Global PR & Marketing']);
                 setRegion(q.region || 'Global');
                 setSearchPlatforms(q.searchPlatforms || ['generalWeb', 'linkedIn', 'reddit']);
                 setExclusionList(q.exclusionList || '');
@@ -144,11 +156,11 @@ const App: React.FC = () => {
     setEnrichingId(lead.companyName);
     setError(null);
     try {
-        const enrichment = await enrichLead(lead, outreachTone);
+        const enrichment = await enrichLead(lead, outreachTone, departments);
         setLeads(prevLeads => {
             const updated = prevLeads.map(l => l.companyName === lead.companyName ? { ...l, ...enrichment } : l);
             saveSession(updated);
-            return [...updated]; // Spread to ensure React detects change
+            return [...updated]; 
         });
         setSuccessMessage(`Intel Verified for ${lead.companyName}!`);
         setTimeout(() => setSuccessMessage(null), 4000);
@@ -181,7 +193,7 @@ const App: React.FC = () => {
     for (const lead of leadsToProcess) {
         setEnrichingId(lead.companyName);
         try {
-            const enrichment = await enrichLead(lead, outreachTone);
+            const enrichment = await enrichLead(lead, outreachTone, departments);
             setLeads(prevLeads => {
                 const updated = prevLeads.map(l => l.companyName === lead.companyName ? { ...l, ...enrichment } : l);
                 saveSession(updated);
@@ -368,7 +380,7 @@ const App: React.FC = () => {
 
           <div className="mb-10 bg-slate-900/40 p-8 rounded-[2rem] border border-slate-700/50 shadow-inner">
             <label className="block text-[11px] font-black uppercase tracking-[0.2em] mb-6 text-slate-500 text-center">Target Departments (Multi-Select)</label>
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
               {DepartmentOptions.map(dept => (
                 <label key={dept} className={`flex items-center justify-center gap-2 p-3.5 rounded-2xl border text-[10px] font-black cursor-pointer transition-all uppercase tracking-tight ${departments.includes(dept) ? 'bg-purple-600/20 border-purple-500 text-purple-200 shadow-lg shadow-purple-900/20 scale-105' : 'bg-slate-800 border-slate-700 text-slate-500 hover:border-slate-500 hover:text-slate-300'}`}>
                   <input type="checkbox" className="hidden" checked={departments.includes(dept)} onChange={() => setDepartments(prev => prev.includes(dept) ? prev.filter(d => d !== dept) : [...prev, dept])} />

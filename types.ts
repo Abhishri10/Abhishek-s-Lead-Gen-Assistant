@@ -1,17 +1,25 @@
 
+export interface LinkedInPost {
+  content: string;
+  date: string;
+  url: string;
+}
+
 export interface Contact {
+  contactId: string; // Internal UUID for row tracking
   contactName: string;
   designation: string;
   contactLinkedIn: string;
+  email: string;
+  phone: string;
+  latestLinkedInPost?: LinkedInPost | null;
+  outreachSuggestion?: string; // Individualized ice breaker
+  roleValidationNote?: string;
+  isVerified: boolean;
 }
 
 export interface NewsArticle {
   title: string;
-  url: string;
-}
-
-export interface InstagramPost {
-  caption: string;
   url: string;
 }
 
@@ -20,12 +28,6 @@ export interface SWOT {
     weaknesses: string[];
     opportunities: string[];
     threats: string[];
-}
-
-export interface OutreachStep {
-    step: number;
-    subject: string;
-    body: string;
 }
 
 export interface PainPoint {
@@ -39,11 +41,8 @@ export interface Lead {
   companyLinkedIn: string;
   justification: string;
   marketEntrySignals: string[];
-  email: string;
-  phone: string;
-  contacts: Contact[];
   leadScore: number;
-  outreachSuggestion: string; // Used as "Ice Breaker"
+  contacts: Contact[];
   employeeCount?: string;
   latestFunding?: string;
   techStack?: string[];
@@ -51,7 +50,6 @@ export interface Lead {
   swotAnalysis?: SWOT;
   painPointAnalysis?: PainPoint[];
   latestNews?: NewsArticle;
-  outreachCadence?: OutreachStep[];
 }
 
 export interface SearchQuery {
@@ -72,14 +70,12 @@ export interface ScoreExplanation {
     bulletPoints: string[];
 }
 
-// Added CompetitorAnalysis interface to support detailed competitor research features
 export interface CompetitorAnalysis {
   analysis: string;
   marketShare: string;
   recentNews: NewsArticle;
 }
 
-// Added StoredSession interface to support state persistence in local storage
 export interface StoredSession {
   leads: Lead[];
   query: SearchQuery;

@@ -9,52 +9,52 @@ const documentationContent = `
 
 ## 1. Introduction
 
-Inbound- Revenue Intelligence Powerhouse is an intelligent tool designed to automate and enhance the process of finding international companies that show a strong potential and intent to expand into the Indian market. By leveraging the power of Google's Gemini AI and Google Search, it performs deep-dive analysis on companies, identifies key decision-makers, scores lead quality, and even composes personalized outreach emails, transforming raw data into actionable sales intelligence.
+Inbound- Revenue Intelligence Powerhouse is an intelligent tool designed to automate and enhance the process of finding international companies that show a strong potential and intent to expand into the Indian market. By leveraging the power of Google's Gemini AI and Google Search, it performs deep-dive analysis on companies, identifies key decision-makers, scores lead quality, and transforms raw data into actionable sales intelligence.
 
 ## 2. Core Features & Functionality
 
 -   **Targeted Company Search:** Initiate a search based on a specific company name or a broader industry category.
 -   **Lookalike Company Discovery:** For any promising lead, the AI can find other similar companies, expanding your prospect list with highly relevant leads.
--   **Deep-Dive Analysis:** Goes beyond surface-level data to find employee count, latest funding details, the company's tech stack, key competitors, and latest Instagram posts.
--   **Multi-Department Contact ID:** Select multiple departments (e.g., Marketing AND Sales) to find contacts across the organization for each company.
--   **AI-Powered Lead Scoring:** Each lead is assigned a score from 1-100, providing an at-a-glance metric of its quality based on the strength of its market-entry signals.
--   **Personalized Outreach Generation:** Creates a compelling, one-sentence "icebreaker" for each lead and can optionally compose a full, ready-to-send outreach email.
--   **Multi-Platform Intelligence:** Gathers data from the web, LinkedIn, and social media (Facebook, X, Instagram, Reddit, etc.) to build a holistic view of a company's activities and intent.
--   **Data Export:** Easily export all generated data into ".csv", ".xlsx" (with clickable links and multiple sheets for clarity), or copy it for pasting into Google Sheets.
--   **Session Persistence:** Your last search query and results are automatically saved and reloaded when you reopen the app, allowing you to pick up right where you left off.
+-   **Deep-Dive Analysis:** Goes beyond surface-level data to find employee count, latest funding details, tech stack, and SWOT analysis.
+-   **Persistent Export Hub:** Access "Download Excel" and "Download CSV" buttons at any time in the Results area. These export the entire current view by default, or just your selected leads.
+-   **Multi-Sheet Portfolios:** When in "Portfolio View," the Excel export generates a high-stakes 4-sheet document including SWOT and Pain Point mapping.
+-   **Individual PDF Dossiers:** Generate a professional one-page strategic dossier for any "Verified" lead directly from its deep-dive panel.
+-   **AI-Powered Lead Scoring:** Each lead is assigned a score from 1-100, providing an at-a-glance metric of its quality.
+-   **Personalized Outreach Generation:** Creates a high-impact icebreaker for each lead based on real-time research.
+-   **Session Persistence:** Your last search query and results are automatically saved and reloaded when you reopen the app.
 
 ## 3. Benefits of Use
 
--   **Time Savings:** Drastically reduces the hours spent on manual research and data collection.
--   **Increased Efficiency:** Focus your sales efforts on pre-qualified, high-intent leads.
--   **Actionable Intelligence:** Provides not just data, but context and justification for why each company is a good lead.
--   **Improved Outreach Personalization:** Start conversations with relevant, data-driven icebreakers and emails, significantly increasing response rates.
--   **Uncover Hidden Opportunities:** The AI's ability to find lookalike companies helps you discover promising leads you might have otherwise missed.
+-   **Time Savings:** Drastically reduces manual research and data collection hours.
+-   **Efficiency:** Focus sales efforts on pre-qualified, high-intent leads.
+-   **Actionable Intelligence:** Provides context and justification for every lead.
+-   **Improved Conversion:** Start conversations with relevant, data-driven icebreakers.
+-   **Data Readiness:** Professional XLSX/CSV exports ready for CRM upload or CEO presentation.
 
 ## 4. Usage Guide
 
 1.  **Fill the Search Form:**
-    *   **Client Name (Optional):** Enter a specific company name for a deep-dive analysis. If you check "Also find similar companies," the AI will research this primary company AND find others like it.
-    *   **Client Category:** If you don't have a specific company in mind, choose an industry category to find multiple leads within it.
-    *   **Target Departments:** Check one or multiple departments where you want the AI to find contacts (e.g., Marketing, CEO).
-    *   **Search Platforms & Options:** Check the sources you want the AI to use. "Social Media Search (FB, X, Insta, Reddit)" will gather social signals and community discussions. Check "Generate AI Outreach Email" to have a full email composed for each lead.
-    *   **Target Region:** Specify the geographical region of the companies you are targeting.
+    *   **Client Name (Optional):** Enter a specific company for deep research.
+    *   **Market Category:** Choose a specific niche (e.g., Food vs. Beverages).
+    *   **Target Departments:** Select departments to find relevant stakeholders.
+    *   **Target Region:** Specify the geographical HQ location of targets.
 
-2.  **Generate Leads:** Click the "Generate Leads" button. The AI will begin its research. This may take a minute or two as it performs a comprehensive analysis.
+2.  **Generate Leads:** Click "Start Discovery Session". The AI will begin multi-node research.
 
-3.  **Review Results:**
-    *   Leads will appear in the results table, ranked by their Lead Score.
-    *   **Deep Dive:** Click the chevron (v) icon in the "Actions" column to expand a row and see detailed information like funding, tech stack, competitors, and recent Instagram posts.
-    *   **Find Lookalikes:** Click the sparkles icon (✨) to task the AI with finding more companies similar to that specific lead.
-    *   **Export:** Use the buttons at the top right of the results table to download your data in your preferred format. The .xlsx file contains separate, detailed sheets for news and Instagram posts.
+3.  **Review & Export:**
+    *   **Discovery Hub:** View initial findings. Use the "Excel" or "CSV" buttons in the Export Hub to save this raw discovery list.
+    *   **Verification:** Select interesting leads and click "Verify Intel for Selected" to perform deep scraping.
+    *   **Portfolio View:** Toggle to "Portfolio View" to see only verified leads with complete SWOT analysis.
+    *   **Strategic Export:** In Portfolio View, the Excel export is upgraded to a strategic dossier format.
+    *   **PDF Dossier:** Expand a verified lead and click "Download PDF Dossier" for a single-page company briefing.
 `;
 
 const appOverviewDocContent = `
 Inbound- Revenue Intelligence Powerhouse is a next-generation sales intelligence platform designed to bridge the gap between global innovations and the Indian market. Built on a modern tech stack comprising React 19, Tailwind CSS, and powered by the cutting-edge Google Gemini 3 model, the app functions as a sophisticated data scraper and researcher.
 
-The platform specializes in identifying high-intent international leads—particularly in the 'AI & Technology' sector—by scanning LinkedIn, Social Media (Reddit, X, Instagram), and global news networks. It detects subtle expansion signals, such as hiring for India-specific roles or community adoption of tools like Kling AI and RunwayML.
+The platform specializes in identifying high-intent international leads by scanning LinkedIn, Social Media, and global news networks. It detects subtle expansion signals, such as hiring for India-specific roles or community adoption of tools.
 
-Our Unique Selling Proposition (USP) lies in the depth of our automated research. Unlike traditional lead lists, this tool provides full SWOT analyses, verified decision-maker contacts across multiple departments, and pain-point mappings. Furthermore, it automates the creation of personalized outreach cadences that subtly weave in the ZEE value proposition, highlighting assets like ZEE5 and its massive news network spanning 50+ channels. With features like lead scoring and lookalike discovery, Inbound empowers sales teams to move beyond cold calling into high-impact, data-driven storytelling and targeted performance funnels.
+Our Unique Selling Proposition (USP) lies in the depth of our automated research. Unlike traditional lead lists, this tool provides full SWOT analyses, verified decision-maker contacts, and pain-point mappings. Furthermore, it automates the creation of professional intelligence portfolios and PDF dossiers. With features like lead scoring, lookalike discovery, and a persistent Export Hub, Inbound empowers sales teams to move beyond cold calling into high-impact, data-driven storytelling and targeted performance funnels.
 `;
 
 interface DocumentationProps {
